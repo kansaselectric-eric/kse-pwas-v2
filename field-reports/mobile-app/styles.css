@@ -1,0 +1,17 @@
+/* Kansas Electric Field Reports - base styles
+ * TailwindCSS is loaded via CDN in index.html
+ * Keep custom styles minimal; extend via utility classes when possible.
+ */
+
+html, body {
+  height: 100%;
+}
+
+/* iOS PWA viewport fix */
+body {
+  min-height: -webkit-fill-available;
+}
+
+/* Placeholder for future custom components */
+
+

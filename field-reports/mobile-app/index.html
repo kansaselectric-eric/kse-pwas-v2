@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Kansas Electric Field Reports</title>
+  <meta name="theme-color" content="#00458C">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR4nGNgYAAAAAMAAWgmWQ0AAAAASUVORK5CYII=">
+  <style>
+    /* brand theme */
+    :root { --kse-primary:#F7941E; --kse-primary-dark:#d67f14; --kse-secondary:#00458C; --kse-secondary-dark:#003a76; }
+    .brand-hero { background: linear-gradient(135deg,var(--kse-secondary) 0%, #0f5fb3 55%, var(--kse-primary) 100%); color:#fff; padding:1rem; border-radius:0.75rem; box-shadow:0 10px 25px rgba(0,69,140,.15); }
+    .brand-hero h1, .brand-hero p { color:#fff; }
+    .btn { border-radius:0.5rem; font-weight:600; transition: all .2s ease; }
+    .btn-primary { background: var(--kse-secondary); color:#fff; }
+    .btn-primary:hover { background: var(--kse-secondary-dark); }
+    .btn-accent { background: var(--kse-primary); color:#fff; }
+    .btn-accent:hover { background: var(--kse-primary-dark); }
+    .btn-neutral { background:#f1f5f9; color:#334155; }
+    .btn-neutral:hover { background:#e2e8f0; }
+    /* focus overrides for existing utility classes */
+    .focus\:border-sky-500:focus { border-color: var(--kse-secondary) !important; }
+    .focus\:ring-sky-500:focus { box-shadow: 0 0 0 3px rgba(0,69,140,.25) !important; }
+    .text-sky-700 { color: var(--kse-secondary) !important; }
+    /* file input button */
+    input[type="file"]::file-selector-button { background: rgba(0,69,140,.06); color: var(--kse-secondary); border:0; border-radius:.5rem; padding:.5rem .75rem; }
+    input[type="file"]:hover::file-selector-button { background: rgba(0,69,140,.12); }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-2xl mx-auto p-4">
+    <header class="mb-4 brand-hero">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-semibold text-slate-800">Kansas Electric Field Reports</h1>
+          <p class="text-sm text-slate-500">PWA — works offline and syncs automatically.</p>
+        </div>
+        <div class="flex flex-col items-end gap-2">
+          <div id="gsiSignIn" class="min-h-[40px]"></div>
+          <div class="text-xs text-slate-500">
+            <span id="authUser">Not signed in</span>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <form id="reportForm" class="space-y-4 bg-white rounded-xl shadow p-4">
+      <div>
+        <label class="block text-sm font-medium mb-1" for="project">Select project</label>
+        <div class="flex gap-2">
+          <select id="project" required class="flex-1 w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
+          <button type="button" id="addProjectBtn" class="px-3 py-2 rounded-lg btn-neutral">Add</button>
+          <button type="button" id="syncJobsBtn" class="px-3 py-2 rounded-lg btn-primary">Sync Jobs</button>
+        </div>
+          <option value="">Choose a project...</option>
+        <p class="text-xs text-slate-500 mt-1">Frequent projects are saved locally. Sync loads jobs from Acumatica.</p>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="photos">Add photo(s)</label>
+          <input id="photos" type="file" accept="image/*" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+          <div id="photoPreview" class="mt-2 grid grid-cols-4 gap-2"></div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="videos">Add video(s)</label>
+          <input id="videos" type="file" accept="video/*" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+          <div class="mt-2 space-y-2">
+            <div class="flex items-center gap-2">
+              <button type="button" id="videoRecordBtn" class="px-3 py-2 rounded-lg btn-primary">Start Video</button>
+              <span id="videoRecordStatus" class="text-sm text-slate-500">Idle</span>
+            </div>
+            <video id="cameraPreview" class="w-full h-40 bg-black rounded" autoplay muted playsinline></video>
+            <ul id="videoList" class="text-sm text-slate-600 list-disc pl-5"></ul>
+          </div>
+        </div>
+      </div>
+
+      <div class="space-y-2">
+        <label class="block text-sm font-medium">Add voice memo</label>
+        <div class="flex items-center gap-2">
+          <button type="button" id="recordBtn" class="px-3 py-2 rounded-lg btn-primary">Start Recording</button>
+          <span id="recordStatus" class="text-sm text-slate-500">Idle</span>
+        </div>
+        <ul id="audioList" class="text-sm text-slate-600 list-disc pl-5"></ul>
+      </div>
+
+      <dialog id="annotateDialog" class="rounded-xl p-0 border border-slate-200">
+        <form method="dialog" class="p-3 w-[22rem]">
+          <h3 class="text-lg font-semibold mb-2">Annotate Photo</h3>
+          <canvas id="annotateCanvas" width="320" height="240" class="bg-slate-100 rounded border border-slate-200"></canvas>
+          <div class="mt-2 flex items-center gap-2">
+            <button type="button" id="annotateSave" class="px-3 py-1.5 rounded btn-accent text-sm">Save</button>
+            <button id="annotateCancel" class="px-3 py-1.5 rounded btn-neutral text-sm">Cancel</button>
+          </div>
+        </form>
+      </dialog>
+
+      <div>
+        <div class="flex items-center justify-between mb-1">
+          <label class="block text-sm font-medium" for="notes">Notes</label>
+          <div class="flex items-center gap-2">
+            <button type="button" id="dictateBtn" class="px-3 py-1.5 rounded-lg btn-neutral text-sm">Dictate</button>
+            <span id="sttStatus" class="text-xs text-slate-500">Speech: idle</span>
+          </div>
+        </div>
+        <textarea id="notes" rows="4" placeholder="Summary of work completed, issues, materials, etc." class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></textarea>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="manpower">Manpower</label>
+          <input id="manpower" type="number" min="0" step="1" placeholder="0" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div class="flex items-center gap-2">
+          <input id="safetyIssues" type="checkbox" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+          <label for="safetyIssues" class="text-sm">Safety issues observed</label>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="task">Task/Activity</label>
+          <div class="flex gap-2">
+            <select id="task" class="flex-1 w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
+            <button type="button" id="syncTasksBtn" class="px-3 py-2 rounded-lg btn-primary">Sync Tasks</button>
+          </div>
+          <p class="text-xs text-slate-500 mt-1">Pulled from the project schedule.</p>
+        </div>
+        <div></div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium mb-1" for="qtyCompleted">Quantity Completed</label>
+          <input id="qtyCompleted" type="number" min="0" step="0.01" placeholder="0" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+        </div>
+        <div>
+          <label class="block text-sm font-medium mb-1" for="pctToday">Progress Today (%)</label>
+          <input id="pctToday" type="number" min="0" max="100" step="1" placeholder="0" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+        </div>
+      </div>
+
+      <button type="submit" class="w-full px-4 py-2 rounded-lg btn-accent">Submit Daily Report</button>
+
+      <div id="status" class="text-sm text-slate-500"></div>
+    </form>
+
+    <section class="mt-6 bg-white rounded-xl shadow p-4">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-semibold">Offline Queue</h2>
+        <div class="flex gap-2">
+          <button id="retryAllBtn" class="px-3 py-1.5 rounded btn-primary text-sm">Retry Now</button>
+          <button id="settingsBtn" class="px-3 py-1.5 rounded btn-neutral text-sm">Settings</button>
+        </div>
+      </div>
+      <p class="text-xs text-slate-500 mb-2">Reports saved offline will sync automatically when online.</p>
+      <div id="queueSummary" class="text-xs text-slate-500 mb-2">0 queued</div>
+      <ul id="queueList" class="divide-y divide-slate-200"></ul>
+    </section>
+
+    <dialog id="settingsDialog" class="rounded-xl p-0 border border-slate-200">
+      <form method="dialog" class="p-4 w-[22rem]">
+        <h3 class="text-lg font-semibold mb-3">Settings</h3>
+        <label class="flex items-center justify-between mb-2">
+          <span class="text-sm">Image compression</span>
+          <input id="flagCompression" type="checkbox" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+        </label>
+        <label class="flex items-center justify-between mb-2">
+          <span class="text-sm">Chunked uploads (stub)</span>
+          <input id="flagChunks" type="checkbox" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+        </label>
+        <div class="mt-4 flex justify-end gap-2">
+          <button id="settingsCancel" class="px-3 py-1.5 rounded btn-neutral text-sm">Cancel</button>
+          <button id="settingsSave" class="px-3 py-1.5 rounded btn-primary text-sm">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <footer class="mt-6 text-xs text-slate-400">
+      <p>Status: <span id="networkStatus">checking...</span> • Last sync: <span id="lastSync">never</span></p>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').then(async (reg) => {
+          if (reg && reg.active) {
+            try {
+              const updateFound = await reg.update();
+            } catch (e) {
+              // ignore
+            }
+          }
+        }).catch(console.error);
+      });
+    }
+  </script>
+</body>
+</html>
+
+

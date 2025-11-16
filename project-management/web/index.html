@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KSE Project Management KPIs</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* brand */
+    :root { --kse-primary:#F7941E; --kse-primary-dark:#d67f14; --kse-secondary:#00458C; --kse-secondary-dark:#003a76; }
+    .brand-hero { background: linear-gradient(135deg,var(--kse-secondary) 0%, #0f5fb3 55%, var(--kse-primary) 100%); color:#fff; padding:1rem; border-radius:0.75rem; box-shadow:0 10px 25px rgba(0,69,140,.15); }
+    .brand-hero h1, .brand-hero p { color:#fff; }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-5xl mx-auto p-4">
+    <header class="mb-4 brand-hero">
+      <h1 class="text-2xl font-semibold">Project Management KPIs</h1>
+      <p class="text-sm text-slate-500">Daily snapshot across Field Reports, Opportunity Radar, CRM, and Forecast.</p>
+    </header>
+    <main class="grid md:grid-cols-2 gap-4">
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Field Reports (7d)</h2>
+        <ul class="text-sm">
+          <li>Reports: <span id="frReports">-</span></li>
+          <li>Manpower: <span id="frManpower">-</span></li>
+          <li>Safety Issues: <span id="frSafety">-</span></li>
+        </ul>
+        <canvas id="frChart" height="80" class="mt-3"></canvas>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Opportunity Radar</h2>
+        <ul class="text-sm">
+          <li>New (7d): <span id="radarNew">-</span></li>
+          <li>High-score (7d): <span id="radarHigh">-</span></li>
+          <li>Total: <span id="radarTotal">-</span></li>
+        </ul>
+        <canvas id="radarChart" height="80" class="mt-3"></canvas>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">CRM (7d)</h2>
+        <ul class="text-sm">
+          <li>Touches: <span id="crmTouches">-</span></li>
+          <li>Top Accounts: <span id="crmTop">-</span></li>
+        </ul>
+        <canvas id="crmChart" height="80" class="mt-3"></canvas>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Forecast</h2>
+        <ul class="text-sm">
+          <li>Weighted 90d: $<span id="forecast90">-</span></li>
+        </ul>
+        <canvas id="forecastChart" height="80" class="mt-3"></canvas>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4 md:col-span-2">
+        <h2 class="text-lg font-semibold mb-2">Schedule Health</h2>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500">
+              <tr><th class="py-2 pr-4">Date</th><th class="py-2 pr-4">Project</th><th class="py-2 pr-4">Planned %</th><th class="py-2 pr-4">Actual %</th><th class="py-2 pr-4">Variance %</th><th class="py-2 pr-4">SPI</th></tr>
+            </thead>
+            <tbody id="scheduleBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4 md:col-span-2">
+        <h2 class="text-lg font-semibold mb-2">Manpower Forecast (14 days)</h2>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500">
+              <tr><th class="py-2 pr-4">Date</th><th class="py-2 pr-4">Foremen</th><th class="py-2 pr-4">Journeymen</th><th class="py-2 pr-4">Apprentices</th><th class="py-2 pr-4">Total</th></tr>
+            </thead>
+            <tbody id="manpowerBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Manpower by Division (14 days)</h2>
+        <table class="min-w-full text-sm">
+          <thead class="text-left text-slate-500"><tr><th class="py-2 pr-4">Division</th><th class="py-2 pr-4">Total</th></tr></thead>
+          <tbody id="divisionBody"></tbody>
+        </table>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Manpower by Project (14 days)</h2>
+        <div class="overflow-auto">
+          <table class="min-w-full text-sm">
+            <thead class="text-left text-slate-500"><tr><th class="py-2 pr-4">Project</th><th class="py-2 pr-4">Total</th></tr></thead>
+            <tbody id="projectBody"></tbody>
+          </table>
+        </div>
+      </section>
+      <section class="bg-white rounded-xl shadow p-4 md:col-span-2">
+        <h2 class="text-lg font-semibold mb-2">Project Manpower Heatmap</h2>
+        <div class="overflow-auto">
+          <table class="text-xs">
+            <thead class="text-left text-slate-500"><tr id="heatmapHead"></tr></thead>
+            <tbody id="heatmapBody"></tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(console.error));
+    }
+  </script>
+</body>
+<!-- TODO: add auth + environment config -->
+</html>
+
+

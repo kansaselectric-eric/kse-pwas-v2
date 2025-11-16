@@ -1,0 +1,25 @@
+{
+  "name": "Kansas Electric Field Reports",
+  "short_name": "KSE Reports",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0ea5e9",
+  "description": "Capture daily field reports with photos, videos, and voice memos. Works offline.",
+  "icons": [
+    {
+      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAQAAACxVYVxAAAACXBIWXMAAAsSAAALEgHS3X78AAAAJElEQVR4nO3BMQEAAADCoPVPbQ8HFAAAAAAAAAAAAAAAAAAAAAAA4B4mDgABzU8W2QAAAABJRU5ErkJggg==",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAgAAAAIACAQAAABvVx1LAAAACXBIWXMAAAsSAAALEgHS3X78AAAAKUlEQVR4nO3BMQEAAADCoPVPbQhPoAAAAAAAAAAAAAAAAAAAAAAAAD4gJb4AAf5bKzEAAAAASUVORK5CYII=",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
+
+

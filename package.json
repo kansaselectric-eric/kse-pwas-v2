@@ -1,0 +1,20 @@
+{
+  "name": "kse-tools",
+  "private": true,
+  "workspaces": [
+    "server",
+    "project-management/react-app",
+    "packages/ui"
+  ],
+  "scripts": {
+    "start": "npm -w server run start",
+    "dev": "npm -w server run dev",
+    "pm:dev": "npm -w project-management/react-app run dev",
+    "pm:build": "npm -w project-management/react-app run build",
+    "pm:preview": "npm -w project-management/react-app run preview",
+    "lint": "eslint . --ext .ts,.tsx,.js",
+    "format": "prettier --write ."
+  }
+}
+
+

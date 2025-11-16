@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KSE CRM</title>
+  <meta name="theme-color" content="#00458C">
+  <link rel="manifest" href="manifest.json">
+  <style>
+    /* brand */
+    :root { --kse-primary:#F7941E; --kse-primary-dark:#d67f14; --kse-secondary:#00458C; --kse-secondary-dark:#003a76; }
+    .brand-hero { background: linear-gradient(135deg,var(--kse-secondary) 0%, #0f5fb3 55%, var(--kse-primary) 100%); color:#fff; padding:1rem; border-radius:0.75rem; box-shadow:0 10px 25px rgba(0,69,140,.15); }
+    .brand-hero h1, .brand-hero p { color:#fff; }
+    .btn { border-radius:0.5rem; font-weight:600; transition: all .2s ease; }
+    .btn-primary { background: var(--kse-secondary); color:#fff; }
+    .btn-primary:hover { background: var(--kse-secondary-dark); }
+    .btn-accent { background: var(--kse-primary); color:#fff; }
+    .btn-accent:hover { background: var(--kse-primary-dark); }
+    .btn-neutral { background:#f1f5f9; color:#334155; }
+    .btn-neutral:hover { background:#e2e8f0; }
+    .focus\:border-sky-500:focus { border-color: var(--kse-secondary) !important; }
+    .focus\:ring-sky-500:focus { box-shadow: 0 0 0 3px rgba(0,69,140,.25) !important; }
+    input[type="file"]::file-selector-button { background: rgba(0,69,140,.06); color: var(--kse-secondary); border:0; border-radius:.5rem; padding:.5rem .75rem; }
+    input[type="file"]:hover::file-selector-button { background: rgba(0,69,140,.12); }
+  </style>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="max-w-6xl mx-auto p-4">
+    <header class="mb-4 flex items-start justify-between gap-3 brand-hero">
+      <div>
+        <h1 class="text-2xl font-semibold">KSE CRM</h1>
+        <p class="text-sm text-slate-500">Log and analyze customer interactions. Works offline with auto-sync.</p>
+      </div>
+      <div class="flex flex-col items-end gap-2">
+        <div id="gsiSignIn" class="min-h-[40px]"></div>
+        <div class="text-xs text-slate-500"><span id="authUser">Not signed in</span></div>
+      </div>
+    </header>
+
+    <main class="grid md:grid-cols-3 gap-4">
+      <aside class="md:col-span-1 space-y-4">
+        <section class="bg-white rounded-xl shadow p-4">
+          <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold">Filters</h2>
+            <button id="refreshBtn" class="px-3 py-1.5 rounded btn-primary text-sm">Refresh</button>
+          </div>
+          <label class="block text-sm mb-1">Customer</label>
+          <select id="filterCompany" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
+          <label class="block text-sm mt-3 mb-1">Contact</label>
+          <select id="filterContact" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
+          <label class="block text-sm mt-3 mb-1">Type</label>
+          <select id="filterType" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            <option value="">Any</option>
+            <option>Email</option>
+            <option>Call</option>
+            <option>Meeting</option>
+            <option>Site Visit</option>
+            <option>Bid/RFP</option>
+            <option>Other</option>
+          </select>
+          <label class="block text-sm mt-3 mb-1">Date Range</label>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="filterFrom" type="date" class="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            <input id="filterTo" type="date" class="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+          </div>
+          <label class="block text-sm mt-3 mb-1">Search</label>
+          <input id="filterSearch" type="text" placeholder="subject, notes, tags..." class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+          <div class="mt-3 flex gap-2">
+            <button id="applyFilters" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Apply</button>
+            <button id="resetFilters" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Reset</button>
+          </div>
+        </section>
+
+        <section class="bg-white rounded-xl shadow p-4">
+          <h2 class="text-lg font-semibold mb-2">Exports</h2>
+          <div class="flex gap-2">
+            <button id="exportCsv" class="px-3 py-1.5 rounded btn-accent text-white text-sm">CSV</button>
+            <button id="exportJson" class="px-3 py-1.5 rounded bg-slate-800 text-white text-sm hover:bg-slate-900">JSON</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="md:col-span-2 space-y-4">
+        <section class="bg-white rounded-xl shadow p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Log Interaction</h2>
+            <div class="flex items-center gap-3">
+              <div class="text-xs text-slate-500">Status: <span id="networkStatus">checking...</span> • Last sync: <span id="lastSync">never</span></div>
+              <button type="button" id="dictateBtn" class="px-3 py-1.5 rounded btn-neutral text-sm">Dictate</button>
+              <span id="sttStatus" class="text-xs text-slate-500">Speech: idle</span>
+            </div>
+          </div>
+          <form id="touchForm" class="grid md:grid-cols-2 gap-3 mt-3">
+            <div>
+              <label class="block text-sm mb-1">Customer</label>
+              <select id="company" required class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Contact</label>
+              <select id="contact" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Type</label>
+              <select id="type" required class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+                <option>Email</option><option>Call</option><option>Meeting</option><option>Site Visit</option><option>Bid/RFP</option><option>Other</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Channel</label>
+              <select id="channel" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+                <option>Email</option><option>Phone</option><option>Video</option><option>In-Person</option><option>SMS</option><option>Other</option>
+              </select>
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm mb-1">Subject</label>
+              <input id="subject" type="text" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm mb-1">Notes</label>
+              <textarea id="notes" rows="4" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></textarea>
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Tags (comma-separated)</label>
+              <input id="tags" type="text" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Next Follow-Up</label>
+              <input id="nextFollowUp" type="date" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Outcome</label>
+              <select id="outcome" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+                <option value="">None</option><option>Positive</option><option>Neutral</option><option>Negative</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Sentiment</label>
+              <input id="sentiment" type="range" min="1" max="5" value="3" class="w-full">
+            </div>
+            <div>
+              <label class="block text-sm mb-1">Duration (minutes)</label>
+              <input id="duration" type="number" min="0" step="1" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            </div>
+            <div class="md:col-span-2">
+              <label class="block text-sm mb-1">Attachments</label>
+              <input id="attachments" type="file" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+            </div>
+            <div class="md:col-span-2">
+              <button type="submit" class="w-full px-4 py-2 rounded-lg btn-accent">Log Interaction</button>
+            </div>
+            <div id="status" class="md:col-span-2 text-sm text-slate-500"></div>
+          </form>
+        </section>
+
+        <section class="bg-white rounded-xl shadow p-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-semibold">Interactions</h2>
+            <div class="text-xs text-slate-500"><span id="count"></span></div>
+          </div>
+          <ul id="interactions" class="divide-y divide-slate-200"></ul>
+        </section>
+
+        <section class="bg-white rounded-xl shadow p-4">
+          <h2 class="text-lg font-semibold mb-2">Last 14 Days</h2>
+          <canvas id="trendChart" height="120"></canvas>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('service-worker.js').catch(console.error);
+      });
+    }
+  </script>
+</body>
+</html>
+
+

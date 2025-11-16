@@ -1,0 +1,27 @@
+name: CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm install
+      - name: Lint
+        run: npm run lint --if-present
+      - name: Build server
+        run: npm -w server run build
+      - name: Test server
+        run: npm -w server run test
+      - name: Build PM React
+        run: npm -w project-management/react-app run build
+
+
+
