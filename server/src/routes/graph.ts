@@ -16,8 +16,9 @@ graphRouter.post('/token', async (_req, res) => {
     });
     const tokenRes = await axios.post(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, form);
     res.json({ ok: true, token: tokenRes.data.access_token, expires_in: tokenRes.data.expires_in });
-  } catch (e: any) {
-    res.status(500).json({ ok: false, error: String(e?.message || e) });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    res.status(500).json({ ok: false, error: message });
   }
 });
 

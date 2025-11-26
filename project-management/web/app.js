@@ -1,3 +1,4 @@
+/* global Chart */
 // Fetch KPIs from Apps Script endpoint and render
 const APPS_SCRIPT_PM_ENDPOINT = 'https://script.google.com/macros/s/YOUR_PM_APPS_SCRIPT_WEB_APP_URL/exec'; // TODO replace
 
@@ -23,30 +24,36 @@ async function loadKpis() {
     if (hist && hist.history) {
       renderCharts(hist.history);
     }
-  // Load schedule health
-  try {
-    const resSched = await fetch(`${APPS_SCRIPT_PM_ENDPOINT}?action=schedule_health`);
-    const dataSched = await resSched.json();
-    if (dataSched && dataSched.schedule) renderSchedule(dataSched.schedule);
-  } catch (e) {}
-  // Load manpower forecast
-  try {
-    const resMf = await fetch(`${APPS_SCRIPT_PM_ENDPOINT}?action=manpower_forecast&days=14`);
-    const dataMf = await resMf.json();
-    if (dataMf && dataMf.forecast) renderManpower(dataMf.forecast);
-  } catch (e) {}
-  // Load manpower breakdown
-  try {
-    const resMb = await fetch(`${APPS_SCRIPT_PM_ENDPOINT}?action=manpower_breakdown&days=14`);
-    const dataMb = await resMb.json();
-    if (dataMb && dataMb.breakdown) {
-      renderDivision(dataMb.breakdown.division || []);
-      renderProjectTotals(dataMb.breakdown.project || []);
-      renderHeatmap(dataMb.breakdown.heatmap || { dates: [], rows: [] });
+    // Load schedule health
+    try {
+      const resSched = await fetch(`${APPS_SCRIPT_PM_ENDPOINT}?action=schedule_health`);
+      const dataSched = await resSched.json();
+      if (dataSched && dataSched.schedule) renderSchedule(dataSched.schedule);
+    } catch (err) {
+      console.warn('Failed to load schedule health', err);
     }
-  } catch (e) {}
-  } catch (e) {
-    // ignore
+    // Load manpower forecast
+    try {
+      const resMf = await fetch(`${APPS_SCRIPT_PM_ENDPOINT}?action=manpower_forecast&days=14`);
+      const dataMf = await resMf.json();
+      if (dataMf && dataMf.forecast) renderManpower(dataMf.forecast);
+    } catch (err) {
+      console.warn('Failed to load manpower forecast', err);
+    }
+    // Load manpower breakdown
+    try {
+      const resMb = await fetch(`${APPS_SCRIPT_PM_ENDPOINT}?action=manpower_breakdown&days=14`);
+      const dataMb = await resMb.json();
+      if (dataMb && dataMb.breakdown) {
+        renderDivision(dataMb.breakdown.division || []);
+        renderProjectTotals(dataMb.breakdown.project || []);
+        renderHeatmap(dataMb.breakdown.heatmap || { dates: [], rows: [] });
+      }
+    } catch (err) {
+      console.warn('Failed to load manpower breakdown', err);
+    }
+  } catch (err) {
+    console.error('Failed to load PM KPIs', err);
   }
 }
 

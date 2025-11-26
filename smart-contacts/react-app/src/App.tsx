@@ -10,11 +10,13 @@ type Contact = {
   tags?: string[];
 };
 
+type SortKey = 'name' | 'company' | 'title';
+
 export default function App() {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState('');
-  const [sort, setSort] = useState<'name'|'company'|'title'>('name');
+  const [sort, setSort] = useState<SortKey>('name');
 
   const filtered = useMemo(() => {
     let list = contacts.slice();
@@ -29,7 +31,12 @@ export default function App() {
       const t = tag.toLowerCase();
       list = list.filter(c => (c.tags || []).some(x => String(x).toLowerCase().includes(t)));
     }
-    list.sort((a: any, b: any) => String(a[sort] || '').localeCompare(String(b[sort] || '')));
+    const sortKey: SortKey = sort;
+    list.sort((a, b) => {
+      const left = String(a[sortKey] || '');
+      const right = String(b[sortKey] || '');
+      return left.localeCompare(right);
+    });
     return list;
   }, [contacts, query, tag, sort]);
 
@@ -60,7 +67,9 @@ export default function App() {
     try {
       const cached = JSON.parse(localStorage.getItem('kse_contacts_cache') || '[]');
       if (Array.isArray(cached)) setContacts(cached);
-    } catch {}
+    } catch (err) {
+      console.warn('Failed to load cached contacts', err);
+    }
   }, []);
 
   return (
@@ -75,7 +84,7 @@ export default function App() {
             <input type="file" accept="application/json" onChange={onFile} className="text-sm" />
             <input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search name, company, tag, email, phone..." className="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm px-3 py-2" />
             <input value={tag} onChange={e => setTag(e.target.value)} placeholder="Filter tag..." className="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm px-3 py-2" />
-            <select value={sort} onChange={e => setSort(e.target.value as any)} className="rounded border-slate-300 text-sm px-2 py-2">
+            <select value={sort} onChange={e => setSort(e.target.value as SortKey)} className="rounded border-slate-300 text-sm px-2 py-2">
               <option value="name">Sort: Name</option>
               <option value="company">Sort: Company</option>
               <option value="title">Sort: Title</option>

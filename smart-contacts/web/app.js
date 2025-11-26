@@ -171,6 +171,8 @@ try {
     contacts = cached;
     renderResults(applyFilters(contacts));
   }
-} catch {}
+} catch (err) {
+  console.warn('Failed to load cached contacts', err);
+}
 
 

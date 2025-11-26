@@ -1,9 +1,10 @@
+/* eslint-env serviceworker */
 /* Kansas Electric Field Reports - Service Worker with Workbox */
 
 try {
   importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
 } catch (e) {
-  // fallback to no-op
+  console.warn('Workbox failed to load', e);
 }
 
 if (self.workbox) {
@@ -62,11 +63,12 @@ async function syncQueuedReports_() {
     // Load ID token from localStorage via clients API (best-effort)
     let idToken = null;
     try {
-      const allClients = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
-      // try to message a client for token; fallback to reading indexedDB/localStorage is restricted here
-      // In practice, we rely on the client attaching token on interactive submits.
+      const clientsList = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+      if (clientsList.length > 0) {
+        // Future enhancement: request an idToken from a focused client via postMessage
+      }
     } catch (e) {
-      // ignore
+      console.warn('Unable to enumerate SW clients for token sharing', e);
     }
 
     for (const item of items) {
@@ -88,11 +90,11 @@ async function syncQueuedReports_() {
           });
         }
       } catch (e) {
-        // ignore, will retry next sync
+        console.warn('Field report upload failed during sync, will retry', e);
       }
     }
   } catch (e) {
-    // swallow
+    console.error('Field report background sync failed', e);
   }
 }
 

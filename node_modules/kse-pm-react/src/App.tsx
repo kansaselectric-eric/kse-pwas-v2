@@ -2,22 +2,29 @@ import React, { useEffect, useState } from 'react';
 import { KpiCard } from './components/KpiCard';
 import { ScheduleTable } from './components/ScheduleTable';
 import { fetchHistory, fetchKpis, fetchScheduleHealth, fetchManpowerForecast, fetchManpowerBreakdown } from './lib/api';
+import type { Kpis, HistoryPoint, ScheduleRow, ManpowerForecastRow, ManpowerBreakdown } from './lib/api';
 import { ManpowerTable } from './components/ManpowerTable';
 import { BreakdownTables } from './components/BreakdownTables';
 import { Heatmap } from './components/Heatmap';
 
 export default function App() {
   const [loading, setLoading] = useState(true);
-  const [kpis, setKpis] = useState<any>(null);
-  const [history, setHistory] = useState<any[]>([]);
-  const [schedule, setSchedule] = useState<any[]>([]);
-  const [manpower, setManpower] = useState<any[]>([]);
-  const [breakdown, setBreakdown] = useState<any | null>(null);
+  const [kpis, setKpis] = useState<Kpis | null>(null);
+  const [, setHistory] = useState<HistoryPoint[]>([]);
+  const [schedule, setSchedule] = useState<ScheduleRow[]>([]);
+  const [manpower, setManpower] = useState<ManpowerForecastRow[]>([]);
+  const [breakdown, setBreakdown] = useState<ManpowerBreakdown | null>(null);
 
   useEffect(() => {
     (async () => {
       try {
-        const [k, h, s, m, b] = await Promise.all([fetchKpis(), fetchHistory(30), fetchScheduleHealth(), fetchManpowerForecast(14), fetchManpowerBreakdown(14)]);
+        const [k, h, s, m, b] = await Promise.all([
+          fetchKpis(),
+          fetchHistory(30),
+          fetchScheduleHealth(),
+          fetchManpowerForecast(14),
+          fetchManpowerBreakdown(14)
+        ]);
         setKpis(k);
         setHistory(h);
         setSchedule(s);
@@ -31,6 +38,10 @@ export default function App() {
 
   if (loading) {
     return <div className="min-h-screen bg-slate-50 p-6">Loading…</div>;
+  }
+
+  if (!kpis) {
+    return <div className="min-h-screen bg-slate-50 p-6">Unable to load dashboard data.</div>;
   }
 
   return (
@@ -60,7 +71,7 @@ export default function App() {
           title="CRM (7d)"
           items={[
             { label: 'Touches', value: kpis.crm.touches7d },
-            { label: 'Top Accounts', value: (kpis.crm.topAccounts || []).map((t: any) => `${t.name} (${t.touches})`).join(', ') || 'n/a' }
+            { label: 'Top Accounts', value: (kpis.crm.topAccounts || []).map((t) => `${t.name} (${t.touches})`).join(', ') || 'n/a' }
           ]}
         />
         <KpiCard
