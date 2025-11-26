@@ -1,0 +1,91 @@
+[
+  {
+    "item": "4in EMT Conduit with Pull Wire",
+    "unit": "lf",
+    "avgUnitPrice": 14.85,
+    "avgLaborHours": 0.22,
+    "segments": ["Industrial", "Data Center"],
+    "winRate": 0.61,
+    "lastBidDate": "2025-02-02",
+    "keywords": ["4in emt conduit", "4 in conduit", "emt feeder", "pull wire"],
+    "notes": "Includes copper pull wire and supports at 8ft spacing"
+  },
+  {
+    "item": "15kV Metal-Clad Switchgear Section",
+    "unit": "ea",
+    "avgUnitPrice": 186000,
+    "avgLaborHours": 42,
+    "segments": ["Utility", "Industrial"],
+    "winRate": 0.55,
+    "lastBidDate": "2025-01-12",
+    "keywords": ["15kv switchgear", "metal clad", "medium voltage lineup"],
+    "notes": "Factory witness testing assumed, excludes relay programming"
+  },
+  {
+    "item": "480V MCC Bucket Retrofit",
+    "unit": "ea",
+    "avgUnitPrice": 8200,
+    "avgLaborHours": 9.5,
+    "segments": ["Industrial", "Manufacturing"],
+    "winRate": 0.68,
+    "lastBidDate": "2024-11-04",
+    "keywords": ["mcc bucket", "motor control center", "bucket retrofit"],
+    "notes": "Includes demo, install, torque verification"
+  },
+  {
+    "item": "Grounding Grid with Exothermic Welds",
+    "unit": "lf",
+    "avgUnitPrice": 9.4,
+    "avgLaborHours": 0.18,
+    "segments": ["Utility", "Substation"],
+    "winRate": 0.72,
+    "lastBidDate": "2024-12-18",
+    "keywords": ["ground grid", "exothermic", "cadweld", "grounding conductor"],
+    "notes": "Assumes 2/0 bare copper in crushed rock yard"
+  },
+  {
+    "item": "Fire Alarm Riser with Devices",
+    "unit": "floor",
+    "avgUnitPrice": 11750,
+    "avgLaborHours": 26,
+    "segments": ["Healthcare", "Commercial"],
+    "winRate": 0.59,
+    "lastBidDate": "2025-03-08",
+    "keywords": ["fire alarm riser", "notification devices", "initiating devices"],
+    "notes": "Includes programming allowance"
+  },
+  {
+    "item": "Generator Paralleling Gear",
+    "unit": "ea",
+    "avgUnitPrice": 243000,
+    "avgLaborHours": 65,
+    "segments": ["Mission Critical", "Healthcare"],
+    "winRate": 0.48,
+    "lastBidDate": "2024-10-27",
+    "keywords": ["paralleling gear", "generator switchgear", "genset controls"],
+    "notes": "Does not include load bank or fuel polishing"
+  },
+  {
+    "item": "Prefabricated Rack Lighting Package",
+    "unit": "zone",
+    "avgUnitPrice": 18250,
+    "avgLaborHours": 31,
+    "segments": ["Logistics", "Warehouse"],
+    "winRate": 0.66,
+    "lastBidDate": "2025-02-20",
+    "keywords": ["rack lighting", "prefab whips", "aisle lighting zone"],
+    "notes": "Includes factory-whipped harnesses and controls integration"
+  },
+  {
+    "item": "Medium Voltage Cable Feeder Set",
+    "unit": "set",
+    "avgUnitPrice": 68400,
+    "avgLaborHours": 24,
+    "segments": ["Substation", "Industrial"],
+    "winRate": 0.58,
+    "lastBidDate": "2025-01-30",
+    "keywords": ["mv cable", "medium voltage feeder", "15kv feeder"],
+    "notes": "Includes terminations both ends, hi-pot testing"
+  }
+]
+

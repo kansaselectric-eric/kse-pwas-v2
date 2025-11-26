@@ -1316,7 +1316,7 @@ function applyExtractionNotesOnly() {
   const extraction = state.dictation.extraction;
   if (!extraction || !el.activityNotes) {
     toast('Run Extract Details first.', 'warning');
-    return;
+      return;
   }
   if (extraction.notes) el.activityNotes.value = extraction.notes;
   toast('Applied AI notes only', 'info');
