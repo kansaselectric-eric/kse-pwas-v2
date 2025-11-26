@@ -7,13 +7,15 @@ on:
 jobs:
   build-test:
     runs-on: ubuntu-latest
+    env:
+      NPM_CONFIG_PRODUCTION: "false"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm install
+      - run: npm install --include=dev
       - name: Lint
         run: npm run lint --if-present
       - name: Build server

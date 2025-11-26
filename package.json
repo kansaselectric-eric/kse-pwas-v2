@@ -14,6 +14,12 @@
     "pm:preview": "npm -w project-management/react-app run preview",
     "lint": "eslint . --ext .ts,.tsx,.js",
     "format": "prettier --write ."
+  },
+  "devDependencies": {
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react": "^7.34.1"
   }
 }
 
