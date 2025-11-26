@@ -1,0 +1,11 @@
+{
+  "name": "KSE Enterprise CRM",
+  "short_name": "KSE CRM",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "theme_color": "#0ea5e9",
+  "background_color": "#020617",
+  "description": "Offline-first CRM tailored for Enterprise Customer Development workflows."
+}
+

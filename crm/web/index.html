@@ -3,175 +3,688 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>KSE CRM</title>
-  <meta name="theme-color" content="#00458C">
+  <title>KSE Enterprise CRM</title>
+  <meta name="theme-color" content="#0ea5e9">
   <link rel="manifest" href="manifest.json">
-  <style>
-    /* brand */
-    :root { --kse-primary:#F7941E; --kse-primary-dark:#d67f14; --kse-secondary:#00458C; --kse-secondary-dark:#003a76; }
-    .brand-hero { background: linear-gradient(135deg,var(--kse-secondary) 0%, #0f5fb3 55%, var(--kse-primary) 100%); color:#fff; padding:1rem; border-radius:0.75rem; box-shadow:0 10px 25px rgba(0,69,140,.15); }
-    .brand-hero h1, .brand-hero p { color:#fff; }
-    .btn { border-radius:0.5rem; font-weight:600; transition: all .2s ease; }
-    .btn-primary { background: var(--kse-secondary); color:#fff; }
-    .btn-primary:hover { background: var(--kse-secondary-dark); }
-    .btn-accent { background: var(--kse-primary); color:#fff; }
-    .btn-accent:hover { background: var(--kse-primary-dark); }
-    .btn-neutral { background:#f1f5f9; color:#334155; }
-    .btn-neutral:hover { background:#e2e8f0; }
-    .focus\:border-sky-500:focus { border-color: var(--kse-secondary) !important; }
-    .focus\:ring-sky-500:focus { box-shadow: 0 0 0 3px rgba(0,69,140,.25) !important; }
-    input[type="file"]::file-selector-button { background: rgba(0,69,140,.06); color: var(--kse-secondary); border:0; border-radius:.5rem; padding:.5rem .75rem; }
-    input[type="file"]:hover::file-selector-button { background: rgba(0,69,140,.12); }
-  </style>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            kse: {
+              orange: '#F7941E',
+              orangeDark: '#d67f14',
+              blue: '#00458C',
+              blueDark: '#002B57'
+            },
+            brand: {
+              DEFAULT: '#F7941E',
+              dark: '#d67f14'
+            },
+            accent: {
+              DEFAULT: '#00458C',
+              dark: '#002B57'
+            }
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --kse-blue: #00458C;
+      --kse-blue-mid: #0D63B8;
+      --kse-blue-dark: #002B57;
+      --kse-orange: #F7941E;
+      --kse-orange-dark: #d67f14;
+      --kse-gray-bg: #F5F7FB;
+      --kse-gray-border: #E2E8F0;
+      --kse-text: #0F172A;
+    }
+    body {
+      background: var(--kse-gray-bg);
+      color: var(--kse-text);
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    .glass-panel {
+      background: #fff;
+      border: 1px solid var(--kse-gray-border);
+      border-radius: 20px;
+      box-shadow: 0 20px 45px rgba(15,23,42,0.08);
+    }
+    .glass-border {
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 24px;
+    }
+    .btn-kse {
+      background: var(--kse-blue);
+      color: #fff;
+      border-radius: 999px;
+      font-weight: 600;
+      transition: background 0.2s ease;
+    }
+    .btn-kse:hover {
+      background: var(--kse-blue-dark);
+    }
+    .btn-accent {
+      background: linear-gradient(120deg, var(--kse-orange), #ffb347);
+      color: var(--kse-text);
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .panel-input,
+    .glass-panel input:not([type="file"]),
+    .glass-panel select,
+    .glass-panel textarea {
+      background: #F2F5FA;
+      border: 1px solid #D7DBE5;
+      border-radius: 12px;
+      color: var(--kse-text);
+      padding: 0.65rem 0.9rem;
+      transition: border-color 0.2s ease, background 0.2s ease;
+    }
+    .glass-panel input:not([type="file"]):focus,
+    .glass-panel select:focus,
+    .glass-panel textarea:focus {
+      border-color: var(--kse-blue-mid);
+      background: #fff;
+      box-shadow: 0 0 0 3px rgba(0,69,140,0.15);
+      outline: none;
+    }
+    .tab-btn {
+      color: var(--kse-blue);
+    }
+    .tab-btn[data-tab].active {
+      background: rgba(0,69,140,0.1);
+      color: var(--kse-blue);
+    }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.4/dist/dexie.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
 </head>
-<body class="bg-slate-50 text-slate-900">
-  <div class="max-w-6xl mx-auto p-4">
-    <header class="mb-4 flex items-start justify-between gap-3 brand-hero">
+<body class="min-h-screen bg-[var(--kse-gray-bg)] text-[var(--kse-text)]">
+  <div id="loginView" class="min-h-screen flex items-center justify-center p-6">
+    <form id="loginForm" class="w-full max-w-md space-y-4 bg-slate-900/80 border border-white/5 rounded-3xl p-8 shadow-2xl">
       <div>
-        <h1 class="text-2xl font-semibold">KSE CRM</h1>
-        <p class="text-sm text-slate-500">Log and analyze customer interactions. Works offline with auto-sync.</p>
+        <p class="text-xs uppercase tracking-[0.4em] text-slate-500">KSE CRM</p>
+        <h1 class="text-2xl font-semibold mt-2">Sign in to continue</h1>
+        <p class="text-sm text-slate-400 mt-1">Use your CRM credentials to unlock the Enterprise cockpit.</p>
       </div>
-      <div class="flex flex-col items-end gap-2">
-        <div id="gsiSignIn" class="min-h-[40px]"></div>
-        <div class="text-xs text-slate-500"><span id="authUser">Not signed in</span></div>
+      <label class="block text-sm">
+        Email
+        <input id="loginEmail" type="email" required class="mt-1 w-full rounded-2xl bg-slate-950/60 border border-slate-800 px-4 py-3 focus:border-brand focus:ring-2 focus:ring-brand/30">
+      </label>
+      <label class="block text-sm">
+        Password
+        <input id="loginPassword" type="password" required class="mt-1 w-full rounded-2xl bg-slate-950/60 border border-slate-800 px-4 py-3 focus:border-brand focus:ring-2 focus:ring-brand/30">
+      </label>
+      <button class="w-full rounded-2xl bg-brand hover:bg-brand-dark px-4 py-3 font-semibold">Sign in</button>
+      <p id="loginError" class="text-sm text-rose-400 h-5"></p>
+    </form>
+  </div>
+
+  <div id="appShell" class="hidden max-w-screen-2xl mx-auto p-4 space-y-4">
+    <header class="rounded-3xl glass-border px-6 py-5 flex flex-wrap items-center justify-between gap-4 shadow-xl text-white" style="background:linear-gradient(90deg,var(--kse-blue-dark),var(--kse-blue-mid),var(--kse-orange));">
+      <div>
+        <p class="text-xs uppercase tracking-[0.3em] text-orange-100">Enterprise CRM</p>
+        <h1 class="text-3xl font-semibold mt-1">KSE Enterprise Growth Console</h1>
+        <p class="text-sm text-slate-200 mt-2 max-w-2xl">Offline-first BD cockpit for Enterprise Customer Development, movement logging, and AI narration.</p>
+      </div>
+      <div class="flex flex-col items-end gap-2 text-sm text-slate-100">
+        <div class="flex items-center gap-3">
+          <div class="text-right">
+            <div class="font-semibold" id="authUser">---</div>
+            <div class="text-xs text-slate-500"><span id="authRole">---</span></div>
+          </div>
+          <button id="logoutBtn" class="px-3 py-1.5 rounded-full border border-white/20 text-xs hover:bg-white/10">Logout</button>
+        </div>
+        <div>Status: <span id="networkStatus">checking...</span> • Last sync <span id="lastSync">never</span></div>
+        <div>Queue: <span id="queueStatus">0 pending</span></div>
       </div>
     </header>
 
-    <main class="grid md:grid-cols-3 gap-4">
-      <aside class="md:col-span-1 space-y-4">
-        <section class="bg-white rounded-xl shadow p-4">
-          <div class="flex items-center justify-between mb-2">
-            <h2 class="text-lg font-semibold">Filters</h2>
-            <button id="refreshBtn" class="px-3 py-1.5 rounded btn-primary text-sm">Refresh</button>
+    <main class="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
+      <aside class="space-y-4 text-kse-blue-dark">
+        <section class="glass-panel rounded-2xl p-5 text-kse-blue-dark">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold text-[var(--kse-text)]">New Enterprise Account</h2>
           </div>
-          <label class="block text-sm mb-1">Customer</label>
-          <select id="filterCompany" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
-          <label class="block text-sm mt-3 mb-1">Contact</label>
-          <select id="filterContact" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
-          <label class="block text-sm mt-3 mb-1">Type</label>
-          <select id="filterType" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-            <option value="">Any</option>
-            <option>Email</option>
-            <option>Call</option>
-            <option>Meeting</option>
-            <option>Site Visit</option>
-            <option>Bid/RFP</option>
-            <option>Other</option>
+          <form id="newAccountForm" class="space-y-3 text-sm">
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Name</label>
+              <input id="newAccountName" type="text" class="mt-1 w-full panel-input">
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Industry</label>
+              <input id="newAccountIndustry" type="text" class="mt-1 w-full panel-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs uppercase tracking-wide text-slate-400">City</label>
+                <input id="newAccountCity" type="text" class="mt-1 w-full panel-input">
+              </div>
+              <div>
+                <label class="text-xs uppercase tracking-wide text-slate-400">State</label>
+                <input id="newAccountState" type="text" class="mt-1 w-full panel-input max-w-[120px]">
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="text-xs uppercase tracking-wide text-slate-400">Annual Potential ($)</label>
+                <input id="newAccountAnnual" type="number" class="mt-1 w-full panel-input">
+              </div>
+              <div>
+                <label class="text-xs uppercase tracking-wide text-slate-400">Projected Value ($)</label>
+                <input id="newAccountProjected" type="number" class="mt-1 w-full panel-input">
+              </div>
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Entrenchment</label>
+              <select id="newAccountEntrenchment" class="mt-1 w-full panel-input">
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Stage</label>
+              <select id="newAccountStage" class="mt-1 w-full panel-input"></select>
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Relationship Health</label>
+              <select id="newAccountRelationship" class="mt-1 w-full panel-input">
+                <option value="Balanced">Balanced</option>
+                <option value="Strong">Strong</option>
+                <option value="Neutral">Neutral</option>
+                <option value="Weak">Weak</option>
+                <option value="At Risk">At Risk</option>
+              </select>
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Account Owner</label>
+              <select id="newAccountOwner" class="mt-1 w-full panel-input"></select>
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Next Step</label>
+              <input id="newAccountNextStep" type="text" class="mt-1 w-full panel-input">
+            </div>
+            <div>
+              <label class="text-xs uppercase tracking-wide text-slate-400">Notes</label>
+              <textarea id="newAccountNotes" rows="3" class="mt-1 w-full panel-input"></textarea>
+            </div>
+            <button class="w-full btn-accent py-3 shadow-md transition">Create Account</button>
+            <div id="newAccountStatus" class="text-xs text-slate-400 min-h-[1rem]"></div>
+          </form>
+        </section>
+
+        <section class="glass-panel rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <h2 class="text-lg font-semibold">Accounts</h2>
+            <button id="refreshBtn" class="text-xs px-3 py-1.5 rounded-full btn-kse shadow-lg">Sync</button>
+          </div>
+          <input id="accountSearch" type="search" placeholder="Search accounts..." class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/30">
+          <label class="block text-xs uppercase tracking-wide text-slate-400 mt-3">Stage</label>
+          <select id="filterStage" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/30">
+            <option value="">All stages</option>
           </select>
-          <label class="block text-sm mt-3 mb-1">Date Range</label>
-          <div class="grid grid-cols-2 gap-2">
-            <input id="filterFrom" type="date" class="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-            <input id="filterTo" type="date" class="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-          </div>
-          <label class="block text-sm mt-3 mb-1">Search</label>
-          <input id="filterSearch" type="text" placeholder="subject, notes, tags..." class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-          <div class="mt-3 flex gap-2">
-            <button id="applyFilters" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Apply</button>
-            <button id="resetFilters" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Reset</button>
+          <label class="block text-xs uppercase tracking-wide text-slate-400 mt-3">Industry</label>
+          <input id="filterIndustry" type="text" placeholder="Industrial, Utilities..." class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/30">
+          <div class="flex gap-2 mt-3">
+            <button id="applyAccountFilters" class="flex-1 rounded-xl border border-slate-700 py-2 text-sm">Apply</button>
+            <button id="resetAccountFilters" class="flex-1 rounded-xl border border-slate-700 py-2 text-sm">Reset</button>
           </div>
         </section>
 
-        <section class="bg-white rounded-xl shadow p-4">
-          <h2 class="text-lg font-semibold mb-2">Exports</h2>
-          <div class="flex gap-2">
-            <button id="exportCsv" class="px-3 py-1.5 rounded btn-accent text-white text-sm">CSV</button>
-            <button id="exportJson" class="px-3 py-1.5 rounded bg-slate-800 text-white text-sm hover:bg-slate-900">JSON</button>
+        <section class="glass-panel rounded-2xl p-0">
+          <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+            <h3 class="text-base font-semibold text-[var(--kse-text)]">Enterprise Pipeline</h3>
+            <span id="accountCount" class="text-xs text-slate-500">0 accounts</span>
+          </div>
+          <div id="accountList" class="max-h-[520px] overflow-y-auto divide-y divide-slate-100"></div>
+        </section>
+
+        <section class="glass-panel rounded-2xl p-5">
+          <h3 class="text-sm font-semibold mb-3 tracking-wide uppercase text-slate-400">ECD Workbook Exports</h3>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <button id="exportPipeline" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Pipeline CSV</button>
+            <button id="exportMovement" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Movement CSV</button>
+            <button id="exportOpportunities" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Opportunities CSV</button>
+            <button id="exportActivities" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Activities CSV</button>
+            <button id="exportWeekly" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Weekly Summary CSV</button>
+            <button id="exportAll" class="rounded-xl btn-kse px-3 py-2 font-semibold col-span-2">Export All</button>
           </div>
         </section>
       </aside>
 
-      <section class="md:col-span-2 space-y-4">
-        <section class="bg-white rounded-xl shadow p-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Log Interaction</h2>
-            <div class="flex items-center gap-3">
-              <div class="text-xs text-slate-500">Status: <span id="networkStatus">checking...</span> • Last sync: <span id="lastSync">never</span></div>
-              <button type="button" id="dictateBtn" class="px-3 py-1.5 rounded btn-neutral text-sm">Dictate</button>
-              <span id="sttStatus" class="text-xs text-slate-500">Speech: idle</span>
+      <section class="space-y-4">
+        <section class="glass-panel rounded-2xl p-5 text-kse-blue-dark">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p class="text-xs uppercase text-slate-400 tracking-wide">Selected account</p>
+              <h2 id="selectedAccountName" class="text-2xl font-semibold mt-1">Select an Enterprise account</h2>
+              <p id="selectedAccountMeta" class="text-sm text-slate-400"></p>
+            </div>
+            <div class="text-right text-sm text-slate-400">
+              <div>Relationship health: <span id="selectedAccountHealth">-</span></div>
+              <div>Projected value: <span id="selectedAccountValue">-</span></div>
             </div>
           </div>
-          <form id="touchForm" class="grid md:grid-cols-2 gap-3 mt-3">
-            <div>
-              <label class="block text-sm mb-1">Customer</label>
-              <select id="company" required class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Contact</label>
-              <select id="contact" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></select>
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Type</label>
-              <select id="type" required class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-                <option>Email</option><option>Call</option><option>Meeting</option><option>Site Visit</option><option>Bid/RFP</option><option>Other</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Channel</label>
-              <select id="channel" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-                <option>Email</option><option>Phone</option><option>Video</option><option>In-Person</option><option>SMS</option><option>Other</option>
-              </select>
-            </div>
-            <div class="md:col-span-2">
-              <label class="block text-sm mb-1">Subject</label>
-              <input id="subject" type="text" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-            </div>
-            <div class="md:col-span-2">
-              <label class="block text-sm mb-1">Notes</label>
-              <textarea id="notes" rows="4" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></textarea>
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Tags (comma-separated)</label>
-              <input id="tags" type="text" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Next Follow-Up</label>
-              <input id="nextFollowUp" type="date" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Outcome</label>
-              <select id="outcome" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-                <option value="">None</option><option>Positive</option><option>Neutral</option><option>Negative</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Sentiment</label>
-              <input id="sentiment" type="range" min="1" max="5" value="3" class="w-full">
-            </div>
-            <div>
-              <label class="block text-sm mb-1">Duration (minutes)</label>
-              <input id="duration" type="number" min="0" step="1" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
-            </div>
-            <div class="md:col-span-2">
-              <label class="block text-sm mb-1">Attachments</label>
-              <input id="attachments" type="file" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
-            </div>
-            <div class="md:col-span-2">
-              <button type="submit" class="w-full px-4 py-2 rounded-lg btn-accent">Log Interaction</button>
-            </div>
-            <div id="status" class="md:col-span-2 text-sm text-slate-500"></div>
-          </form>
         </section>
 
-        <section class="bg-white rounded-xl shadow p-4">
-          <div class="flex items-center justify-between">
-            <h2 class="text-lg font-semibold">Interactions</h2>
-            <div class="text-xs text-slate-500"><span id="count"></span></div>
+        <section class="glass-panel rounded-2xl p-5 space-y-4 text-kse-blue-dark">
+          <div class="flex flex-wrap items-center justify-between gap-3">
+            <h3 class="text-lg font-semibold">Stage Management</h3>
+            <span id="stageStatus" class="text-xs text-slate-400">ECD 9-stage model</span>
           </div>
-          <ul id="interactions" class="divide-y divide-slate-200"></ul>
+          <div class="grid gap-4 md:grid-cols-3">
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Current stage</label>
+              <select id="stageSelect" class="w-full panel-input"></select>
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Move to</label>
+              <select id="stageNextSelect" class="w-full panel-input"></select>
+            </div>
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Movement notes</label>
+              <input id="stageNotes" type="text" placeholder="Why are we moving?" class="w-full panel-input">
+            </div>
+          </div>
+          <div class="grid gap-4 md:grid-cols-[minmax(0,1fr)_1fr] items-end">
+            <div>
+              <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Account owner</label>
+              <select id="accountOwnerSelect" class="w-full panel-input"></select>
+            </div>
+            <div class="text-xs text-slate-500 space-y-1">
+              <p>Last updated by <span id="accountUpdatedBy" class="font-semibold text-[var(--kse-text)]">-</span></p>
+              <p id="accountUpdatedAt">-</p>
+            </div>
+          </div>
+          <div class="flex flex-wrap gap-3 items-center">
+            <button id="advanceStageBtn" class="px-4 py-2 rounded-xl btn-kse font-semibold shadow-lg">Advance Stage</button>
+            <span id="stageSaveStatus" class="text-sm text-slate-400"></span>
+          </div>
         </section>
 
-        <section class="bg-white rounded-xl shadow p-4">
-          <h2 class="text-lg font-semibold mb-2">Last 14 Days</h2>
-          <canvas id="trendChart" height="120"></canvas>
+        <section class="glass-panel rounded-2xl text-kse-blue-dark">
+          <div class="flex flex-wrap gap-2 border-b border-white/5 px-4 py-3" role="tablist">
+            <button class="tab-btn px-4 py-2 rounded-xl bg-brand/20 text-brand font-semibold" data-tab="activityTab">Activity</button>
+            <button class="tab-btn px-4 py-2 rounded-xl hover:bg-slate-800" data-tab="relationshipTab">Relationship Map</button>
+            <button class="tab-btn px-4 py-2 rounded-xl hover:bg-slate-800" data-tab="opportunitiesTab">Opportunities</button>
+            <button class="tab-btn px-4 py-2 rounded-xl hover:bg-slate-800" data-tab="weeklyTab">Weekly BD Summary</button>
+          </div>
+          <div class="p-5 space-y-6">
+            <div id="activityTab" class="tab-panel space-y-5">
+              <div class="flex items-center justify-between">
+                <h4 class="font-semibold text-lg text-white">Log Activity</h4>
+                <button id="openAiAssist" class="text-sm rounded-full px-4 py-2 border border-kse-orange text-kse-orange hover:bg-kse-orange/10">AI Assist</button>
+              </div>
+              <form id="activityForm" class="grid gap-3 lg:grid-cols-2">
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Account</label>
+                  <select id="activityAccount" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2"></select>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Contact</label>
+                  <select id="activityContact" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2"></select>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Type</label>
+                  <select id="activityType" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                    <option value="call">Call</option>
+                    <option value="email">Email</option>
+                    <option value="meeting">Meeting</option>
+                    <option value="onsite">Site Tour</option>
+                    <option value="authenticTouch">Authentic Touch</option>
+                    <option value="aiTranscript">AI Transcript</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Channel</label>
+                  <select id="activityChannel" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                    <option value="email">Email</option>
+                    <option value="phone">Phone</option>
+                    <option value="video">Video</option>
+                    <option value="onsite">Onsite</option>
+                    <option value="AI">AI</option>
+                  </select>
+                </div>
+                <div class="lg:col-span-2">
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Subject</label>
+                  <input id="activitySubject" type="text" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                </div>
+                <div class="lg:col-span-2">
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Notes</label>
+                  <textarea id="activityNotes" rows="4" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2"></textarea>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Tags</label>
+                  <input id="activityTags" type="text" placeholder="pilot, technical, risk" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Next follow-up</label>
+                  <input id="activityNextFollowUp" type="date" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Outcome</label>
+                  <select id="activityOutcome" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                    <option value="">None</option>
+                    <option value="positive">Positive</option>
+                    <option value="neutral">Neutral</option>
+                    <option value="negative">Negative</option>
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Sentiment <span id="sentimentValue" class="text-slate-500">(3)</span></label>
+                  <input id="activitySentiment" type="range" min="1" max="5" value="3" class="w-full">
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Duration (minutes)</label>
+                  <input id="activityDuration" type="number" min="0" step="5" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2">
+                </div>
+                <div class="lg:col-span-2">
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Attachments</label>
+                  <input id="activityAttachments" type="file" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-xl file:border-0 file:bg-brand/10 file:text-brand hover:file:bg-brand/20">
+                </div>
+                <div class="lg:col-span-2 flex flex-wrap gap-3 items-center">
+                  <button type="submit" class="px-5 py-2 rounded-xl bg-brand text-white font-semibold hover:bg-brand-dark">Log activity</button>
+                  <span id="activityStatus" class="text-sm text-slate-400"></span>
+                </div>
+              </form>
+              <div class="grid gap-4 lg:grid-cols-2">
+                <section class="rounded-2xl border border-slate-100 p-4 bg-white shadow-sm">
+                  <h4 class="font-semibold mb-3 text-[var(--kse-text)]">Activity Velocity (14 days)</h4>
+                  <div class="h-56">
+                    <canvas id="accountActivityChart" class="w-full h-full"></canvas>
+                  </div>
+                </section>
+                <section class="rounded-2xl border border-slate-100 p-4 bg-white shadow-sm">
+                  <h4 class="font-semibold mb-3 text-[var(--kse-text)]">AI Assist Snapshot</h4>
+                  <p class="text-sm text-slate-500">Use the AI Assist drawer for narration, extraction, and structured logging. Confidence alerts and partial acceptance built-in.</p>
+                  <div class="mt-4 text-xs text-slate-500" id="aiExtractionStatus">AI idle</div>
+                </section>
+              </div>
+
+              <section class="rounded-2xl border border-white/5 p-4 bg-slate-950/40">
+                <div class="flex items-center justify-between mb-2">
+                  <h4 class="font-semibold">Activity Log</h4>
+                  <span id="activityCount" class="text-xs text-slate-400">0 entries</span>
+                </div>
+                <ul id="activityList" class="divide-y divide-white/5"></ul>
+              </section>
+            </div>
+
+            <div id="relationshipTab" class="tab-panel hidden space-y-4">
+              <div id="relationshipMap" class="space-y-3"></div>
+            </div>
+
+            <div id="opportunitiesTab" class="tab-panel hidden space-y-4">
+              <section class="glass-panel rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-lg font-semibold text-[var(--kse-text)]">Account Opportunities</h4>
+                    <p class="text-sm text-slate-500">Inline edits update immediately.</p>
+                  </div>
+                  <span class="text-xs text-slate-400" id="accountOpportunityCount">0 active</span>
+                </div>
+                <div id="accountOpportunitiesList" class="space-y-3"></div>
+              </section>
+
+              <section class="glass-panel rounded-2xl p-5 space-y-4">
+                <div class="flex items-center justify-between">
+                  <div>
+                    <h4 class="text-lg font-semibold text-[var(--kse-text)]">Project Opportunities</h4>
+                    <p class="text-sm text-slate-500">Track discovery → bid → award in one view.</p>
+                  </div>
+                  <div class="flex gap-2 text-xs">
+                    <button type="button" id="projectFilterAll" class="px-3 py-1 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50">All</button>
+                    <button type="button" id="projectFilterActive" class="px-3 py-1 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50">Active</button>
+                    <button type="button" id="projectFilterWon" class="px-3 py-1 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50">Won</button>
+                  </div>
+                </div>
+                <div id="projectOpportunitiesList" class="space-y-4"></div>
+              </section>
+
+              <form id="opportunityForm" class="space-y-3 rounded-2xl border border-slate-100 p-5 bg-white shadow-sm">
+                <div class="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Opportunity type</label>
+                    <select id="opportunityType" class="w-full panel-input">
+                      <option value="account">Account growth</option>
+                      <option value="project">Project pursuit</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Description</label>
+                    <input id="opportunityDescription" type="text" class="w-full panel-input" placeholder="Rebalance service contract">
+                  </div>
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Value ($)</label>
+                    <input id="opportunityValue" type="number" class="w-full panel-input" placeholder="250000">
+                  </div>
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Status</label>
+                    <select id="opportunityStatus" class="w-full panel-input">
+                      <option value="open">Open</option>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                      <option value="declined">Declined</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="grid gap-3 md:grid-cols-2" data-account-only>
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Stage</label>
+                    <select id="opportunityStage" class="w-full panel-input">
+                      <option value="lead">Lead</option>
+                      <option value="qualified">Qualified</option>
+                      <option value="proposal">Proposal</option>
+                      <option value="pilot">Pilot</option>
+                      <option value="expansion">Expansion</option>
+                      <option value="recurring">Recurring</option>
+              </select>
+                  </div>
+                  <div></div>
+                </div>
+                <div id="projectFields" class="space-y-3 hidden">
+                  <div class="grid gap-3 md:grid-cols-2">
+                    <div>
+                      <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Project name</label>
+                      <input id="projectName" type="text" class="w-full panel-input" placeholder="North River Converter">
+                    </div>
+                    <div>
+                      <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Assigned estimator</label>
+                      <input id="projectEstimator" type="text" class="w-full panel-input" placeholder="Jane Estimator">
+                    </div>
+                  </div>
+                  <div class="grid gap-3 md:grid-cols-3">
+                    <div>
+                      <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">ECD stage</label>
+                      <select id="projectStage" class="w-full panel-input"></select>
+                    </div>
+                    <div>
+                      <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Bid status</label>
+                      <select id="projectBidStatus" class="w-full panel-input"></select>
+                    </div>
+                    <div>
+                      <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Bid due date</label>
+                      <input id="projectBidDue" type="date" class="w-full panel-input">
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <label class="inline-flex items-center gap-2 text-sm text-slate-600">
+                      <input id="projectBudgetary" type="checkbox" class="rounded border-slate-300">
+                      Budgetary only
+                    </label>
+                    <span class="text-xs text-slate-400">Flag estimates not yet tied to a formal RFP.</span>
+                  </div>
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">GC / partners</label>
+                    <input id="projectGcList" type="text" class="w-full panel-input" placeholder="Turner, JE Dunn">
+                  </div>
+                  <div class="grid md:grid-cols-[2fr_1fr] gap-3">
+                    <div>
+                      <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Project address / notes</label>
+                      <textarea id="projectAddress" rows="3" class="w-full panel-input" placeholder="123 Logistics Pkwy, Wichita, KS"></textarea>
+                    </div>
+                    <div class="grid gap-3">
+                      <div>
+                        <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">City</label>
+                        <input id="projectCity" type="text" class="w-full panel-input" placeholder="Wichita">
+                      </div>
+                      <div>
+                        <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">State</label>
+                        <input id="projectState" type="text" class="w-full panel-input" placeholder="KS">
+                      </div>
+                      <div class="flex gap-2">
+                        <button type="button" id="useAccountLocationBtn" class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Use account location</button>
+                        <button type="button" id="useCurrentLocationBtn" class="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Use GPS</button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <input type="hidden" id="projectLat">
+                <input type="hidden" id="projectLng">
+                <input type="hidden" id="projectAccuracy">
+                <button class="w-full rounded-xl btn-kse px-4 py-2 font-semibold">Add Opportunity</button>
+              </form>
+            </div>
+
+            <div id="weeklyTab" class="tab-panel hidden space-y-4">
+              <div class="flex flex-wrap gap-2">
+                <button id="generateWeeklyBtn" class="rounded-xl btn-kse px-4 py-2 font-semibold">Generate Weekly BD Summary</button>
+                <button id="copyWeeklySummary" class="rounded-xl border border-white/20 px-4 py-2 text-sm text-white">Copy Text</button>
+                <button id="weeklySummaryCsvBtn" class="rounded-xl border border-white/20 px-4 py-2 text-sm text-white">Download CSV</button>
+              </div>
+              <textarea id="weeklySummaryText" rows="10" class="w-full rounded-2xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm" readonly placeholder="Executive-ready summary will appear here..."></textarea>
+              <div id="weeklySummaryStatus" class="text-xs text-slate-400"></div>
+            </div>
+          </div>
         </section>
       </section>
+
+      <aside class="space-y-4">
+        <section class="glass-panel rounded-2xl p-5 text-kse-blue-dark">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold">Account Summary</h3>
+            <span id="stalledBadge" class="text-xs px-3 py-1 rounded-full border border-slate-700 text-slate-400">Healthy</span>
+          </div>
+          <dl class="grid grid-cols-2 gap-3 mt-4 text-sm">
+            <div>
+              <dt class="text-slate-400">Stage</dt>
+              <dd id="summaryStage" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Score</dt>
+              <dd id="summaryScore" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">City</dt>
+              <dd id="summaryCity" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">State</dt>
+              <dd id="summaryState" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Account owner</dt>
+              <dd id="summaryOwner" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Last updated</dt>
+              <dd id="summaryUpdatedBy" class="text-sm text-slate-500">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Annual potential</dt>
+              <dd id="summaryAnnualPotential" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Projected value</dt>
+              <dd id="summaryProjectedValue" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Entrenchment</dt>
+              <dd id="summaryEntrenchment" class="text-base font-semibold">-</dd>
+            </div>
+            <div>
+              <dt class="text-slate-400">Last contact</dt>
+              <dd id="summaryLastContact" class="text-base font-semibold">-</dd>
+            </div>
+            <div class="col-span-2">
+              <dt class="text-slate-400">Relationship strength</dt>
+              <dd id="summaryRelationship" class="text-base font-semibold">-</dd>
+            </div>
+            <div class="col-span-2">
+              <dt class="text-slate-400">Opportunity summary</dt>
+              <dd id="summaryOpportunity" class="text-base font-semibold text-brand">-</dd>
+            </div>
+          </dl>
+          <div class="mt-4">
+            <h4 class="text-sm uppercase tracking-wide text-slate-400">Key contacts</h4>
+            <ul id="summaryKeyContacts" class="mt-2 space-y-2 text-sm"></ul>
+          </div>
+          <div class="mt-4">
+            <h4 class="text-sm uppercase tracking-wide text-slate-400">Next 3 steps</h4>
+            <ol id="summaryNextSteps" class="list-decimal list-inside text-sm text-slate-300 space-y-1"></ol>
+          </div>
+          <div class="mt-4">
+            <h4 class="text-sm uppercase tracking-wide text-slate-400">AI Insights</h4>
+            <ul id="summaryAiInsights" class="mt-2 text-sm text-slate-300 space-y-1"></ul>
+          </div>
+        </section>
+        <section class="glass-panel rounded-2xl p-5 text-kse-blue-dark">
+          <h3 class="text-lg font-semibold mb-3">Movement Timeline</h3>
+          <ol id="movementTimeline" class="space-y-3 text-sm"></ol>
+        </section>
+      </aside>
     </main>
   </div>
 
-  <script src="app.js"></script>
+  <div id="aiDrawer" class="fixed inset-0 hidden z-50">
+    <div class="absolute inset-0 bg-black/70"></div>
+    <div class="relative h-full w-full max-w-3xl ml-auto bg-slate-900 border-l border-white/10 flex flex-col glass-panel">
+      <div class="p-6 border-b border-white/5 flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-[0.4em] text-slate-500">AI Assist</p>
+          <h2 class="text-2xl font-semibold">Narrate & Auto-Log Interaction</h2>
+          <p class="text-sm text-slate-400">Record → Transcribe → Extract → Confirm</p>
+        </div>
+        <button id="closeAiAssist" class="text-slate-400 hover:text-white text-sm">Close</button>
+      </div>
+      <div class="flex-1 overflow-y-auto p-6 space-y-4">
+        <div class="rounded-2xl border border-white/5 p-4 bg-slate-950/60">
+          <div class="flex items-center justify-between text-sm text-slate-400">
+            <span id="dictationStatus">Idle</span>
+            <span id="aiConfidenceBadge" class="text-xs px-3 py-1 rounded-full border border-slate-700">Confidence: —</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3 text-sm mt-3">
+            <button id="dictateRecord" class="rounded-xl bg-slate-800 px-3 py-2">Record</button>
+            <button id="dictateStop" class="rounded-xl bg-slate-800 px-3 py-2">Stop</button>
+            <button id="dictateTranscribe" class="rounded-xl bg-slate-800 px-3 py-2">Transcribe</button>
+            <button id="dictateExtract" class="rounded-xl bg-slate-800 px-3 py-2">Extract</button>
+          </div>
+          <textarea id="aiTranscript" rows="6" class="mt-4 w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm" placeholder="Transcript preview..."></textarea>
+        </div>
+        <div class="rounded-2xl border border-white/5 p-4 bg-slate-950/60 space-y-3">
+          <h3 class="font-semibold">Structured Output</h3>
+          <div id="aiStructuredPreview" class="text-sm text-slate-300">Run extraction to see structured data.</div>
+          <div class="flex flex-wrap gap-2 text-sm">
+            <button id="dictateAutofill" class="rounded-xl bg-brand/20 text-brand px-4 py-2">Apply All</button>
+            <button id="dictateApplyNotes" class="rounded-xl border border-slate-700 px-4 py-2">Apply Notes Only</button>
+            <button id="dictateReject" class="rounded-xl border border-rose-500 text-rose-300 px-4 py-2">Reject AI Output</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toastContainer" class="fixed top-4 inset-x-0 flex flex-col items-center gap-2 pointer-events-none"></div>
+
+  <script src="app.js" defer></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
