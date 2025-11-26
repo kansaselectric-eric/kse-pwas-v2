@@ -1,5 +1,10 @@
+/* eslint-env serviceworker */
 /* KSE Estimating PWA - Workbox SW */
-try { importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js'); } catch (e) {}
+try {
+  importScripts('https://storage.googleapis.com/workbox-cdn/releases/6.5.4/workbox-sw.js');
+} catch (err) {
+  console.warn('Workbox failed to load', err);
+}
 if (self.workbox) {
   const { routing, strategies, recipes, precaching } = self.workbox;
   precaching.precacheAndRoute([
@@ -69,7 +74,9 @@ async function syncQueuedEntries_() {
         });
       }
     }
-  } catch {}
+  } catch (err) {
+    console.error('Estimating SW sync failed', err);
+  }
 }
 
 

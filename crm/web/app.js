@@ -4,6 +4,7 @@
  * - ECD workflow cockpit with AI narration
  * - Legacy Apps Script sync placeholder while preparing protected APIs
  */
+/* global Dexie, Chart */
 
 const AUTH_DISABLED = true;
 const API_HOST = 'http://localhost:4000';
@@ -13,11 +14,6 @@ const AUTH_ROUTES = {
   refresh: `${API_BASE}/auth/refresh`,
   me: `${API_BASE}/auth/me`,
   logout: `${API_BASE}/auth/logout`
-};
-
-const CRM_ROUTES = {
-  syncSheets: `${API_BASE}/syncToSheets`,
-  acumatica: `${API_BASE}/acumaticaSync`
 };
 
 const APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwWH8aSuqJcNFYskRw_noZdKhw0t_5i6y2RWQRh7TJQFbgPr_6wOzlQY6FshV3v_C-y/exec';

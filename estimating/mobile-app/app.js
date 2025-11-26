@@ -660,7 +660,9 @@ form.addEventListener('submit', async (e) => {
       photoPreview.innerHTML = '';
       lastSyncEl.textContent = new Date().toLocaleTimeString();
       return;
-    } catch {}
+    } catch (err) {
+      console.error('Online save failed, queueing offline', err);
+    }
   }
   await enqueueEntry({ createdAt: Date.now(), attempts: 0, nextAttempt: Date.now(), payload });
   statusEl.textContent = 'No connection. Entry saved offline and will sync automatically.';
@@ -669,7 +671,9 @@ form.addEventListener('submit', async (e) => {
     try {
       const reg = await navigator.serviceWorker.ready;
       await reg.sync.register('estimating-sync');
-    } catch {}
+    } catch (err) {
+      console.warn('Failed to register background sync', err);
+    }
   }
 });
 
@@ -773,7 +777,15 @@ if (!SpeechRecognition) {
         }
       };
     }
-    if (recognizing) recognition.stop(); else { try { recognition.start(); } catch {} }
+    if (recognizing) {
+      recognition.stop();
+    } else {
+      try {
+        recognition.start();
+      } catch (err) {
+        console.error('Speech recognition start failed', err);
+      }
+    }
   });
 }
 

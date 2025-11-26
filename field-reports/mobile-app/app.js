@@ -17,6 +17,10 @@ const APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/YOUR_APPS_SCRIP
 // TODO: Replace with your Google Client ID
 const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
 
+if (typeof document !== 'undefined' && document.title === '') {
+  document.title = APP_NAME;
+}
+
 const reportForm = document.getElementById('reportForm');
 const networkStatusEl = document.getElementById('networkStatus');
 const statusEl = document.getElementById('status');
@@ -615,7 +619,9 @@ function loadAcumaticaJobsFromCache() {
       acumaticaJobs = raw;
       return raw;
     }
-  } catch {}
+  } catch (err) {
+    console.warn('Failed to parse cached Acumatica jobs', err);
+  }
   return [];
 }
 
@@ -718,6 +724,10 @@ function getSelectedTaskMeta() {
 if (syncTasksBtn) {
   syncTasksBtn.addEventListener('click', syncTasks);
 }
+
+retryAllBtn?.addEventListener('click', () => {
+  syncQueue().catch((err) => console.error('Retry all failed', err));
+});
 
 // -------- Settings dialog --------
 function loadFlags() {
