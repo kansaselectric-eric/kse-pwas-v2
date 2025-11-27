@@ -109,9 +109,9 @@ export async function getMarketInsights(): Promise<MarketInsights> {
 async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
   try {
     const seriesMap: Record<string, { id: string; label: string }> = {
-      electrical: { id: 'PCU335A335A', label: 'Electrical equipment' },
-      copper: { id: 'WPU102', label: 'Copper base scrap' },
-      steel: { id: 'PCU331110331110', label: 'Steel mills' }
+      electrical: { ...defaultSeriesFallback.electrical },
+      copper: { ...defaultSeriesFallback.copper },
+      steel: { ...defaultSeriesFallback.steel }
     };
     const body: Record<string, unknown> = {
       seriesid: Object.values(seriesMap).map((s) => s.id),
@@ -135,12 +135,14 @@ async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
       const changePercent =
         latest && prior ? ((Number(latest.value) - Number(prior.value)) / Number(prior.value)) * 100 : null;
       const key = (meta?.[0] ?? series.seriesID ?? 'unknown') as string;
+      const safeSeriesId = series.seriesID ?? 'UNKNOWN_SERIES';
+      const fallbackLabel = meta?.[1]?.label ?? safeSeriesId;
       out[key] = {
-        seriesId: series.seriesID,
+        seriesId: safeSeriesId,
         latestValue,
         changePercent,
         periodName: latest?.periodName || null,
-        label: meta?.[1].label || series.seriesID
+        label: fallbackLabel
       };
     }
     return out;
@@ -267,6 +269,20 @@ function buildNotes(
   }
   return notes;
 }
+
+type SeriesKey = keyof typeof defaultSeriesFallback;
+
+const defaultSeriesFallback: Record<
+  string,
+  {
+    seriesId: string;
+    label: string;
+  }
+> = {
+  electrical: { seriesId: 'PCU335A335A', label: 'Electrical equipment' },
+  copper: { seriesId: 'WPU102', label: 'Copper base scrap' },
+  steel: { seriesId: 'PCU331110331110', label: 'Steel mills' }
+};
 
 function buildCommodityAlerts(seriesMap: Record<string, PpiInsight>): CommodityAlert[] {
   const alerts: CommodityAlert[] = [];
