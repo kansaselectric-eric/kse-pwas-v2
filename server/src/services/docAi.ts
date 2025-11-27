@@ -1,4 +1,4 @@
-import { DocumentProcessorServiceClient } from '@google-cloud/documentai';
+import { DocumentProcessorServiceClient, protos } from '@google-cloud/documentai';
 import { config } from '../config.js';
 
 type ProcessResult = {
@@ -38,16 +38,17 @@ export async function processWithDocumentAi(rawContent: Buffer, mimeType: string
   };
 }
 
-function buildPageTexts(document: any): string[] {
-  const docText: string = document?.text || '';
-  const pages = document?.pages || [];
-  return pages.map((page: any) => {
-    const layout = page.layout;
-    if (!layout?.textAnchor?.textSegments?.length) return '';
-    return layout.textAnchor.textSegments
-      .map((segment: any) => {
-        const start = Number(segment.startIndex || 0);
-        const end = Number(segment.endIndex || 0);
+function buildPageTexts(document?: protos.google.cloud.documentai.v1.Document | null): string[] {
+  if (!document) return [];
+  const docText = document.text || '';
+  const pages = document.pages || [];
+  return pages.map((page) => {
+    const segments = page?.layout?.textAnchor?.textSegments;
+    if (!segments?.length) return '';
+    return segments
+      .map((segment) => {
+        const start = Number(segment?.startIndex ?? 0);
+        const end = Number(segment?.endIndex ?? 0);
         return docText.slice(start, end);
       })
       .join('');

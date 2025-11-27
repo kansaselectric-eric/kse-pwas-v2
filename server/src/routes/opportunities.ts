@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getOpportunityFeed } from '../services/opportunityScout.js';
+import { getOpportunityFeed, OpportunityType } from '../services/opportunityScout.js';
 import { recordOpportunityUsage, getOpportunityUsageReport } from '../services/opportunityUsage.js';
 import { logger } from '../logger.js';
 
@@ -8,10 +8,13 @@ export const opportunitiesRouter = Router();
 opportunitiesRouter.get('/', async (req, res) => {
   try {
     const { keywords, state, type, minValue, limit } = req.query;
+    const typeParam = typeof type === 'string' ? type : undefined;
+    const normalizedType: OpportunityType | 'all' | undefined =
+      typeParam === 'bid' || typeParam === 'expansion' || typeParam === 'all' ? typeParam : undefined;
     const data = await getOpportunityFeed({
       keywords: typeof keywords === 'string' ? keywords : undefined,
       state: typeof state === 'string' ? state : undefined,
-      type: typeof type === 'string' ? (type as any) : undefined,
+      type: normalizedType,
       minValue: typeof minValue === 'string' ? Number(minValue) : undefined,
       limit: typeof limit === 'string' ? Number(limit) : undefined
     });

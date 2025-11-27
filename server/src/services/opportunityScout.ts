@@ -10,6 +10,34 @@ import { logger } from '../logger.js';
 const seedPath = fileURLToPath(new URL('../data/opportunity-seeds.json', import.meta.url));
 const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 
+type SamApiOpportunity = {
+  noticeId?: string;
+  solnbr?: string;
+  id?: string;
+  notice_id?: string;
+  uiLink?: string;
+  url?: string;
+  title?: string;
+  noticeTitle?: string;
+  subject?: string;
+  description?: string;
+  summary?: string;
+  organizationHierarchy?: string;
+  agency?: string;
+  department?: string;
+  placeOfPerformanceFullAddress?: string;
+  placeOfPerformance?: string;
+  city?: string;
+  naics?: string | string[];
+  naicsCodes?: string | string[];
+  postedDate?: string;
+  publish_date?: string;
+  responseDeadLine?: string;
+  responseDate?: string;
+  dueDate?: string;
+  estimatedValue?: number | string;
+};
+
 export type OpportunityType = 'bid' | 'expansion';
 
 export interface OpportunityRecord {
@@ -203,15 +231,14 @@ async function fetchSamGov(keywords: string[]): Promise<OpportunityRecord[]> {
     q: query
   };
   const { data } = await axios.get('https://api.sam.gov/opportunities/v2/search', { params, timeout: 10000 });
-  const rows: any[] =
+  const rows: SamApiOpportunity[] =
     data?.opportunitiesData?.opportunities || data?.opportunitiesData || data?.searchResult?.searchResults || [];
-  return rows.map((row: any) => {
+  return rows.map((row) => {
     const noticeId = row.noticeId || row.solnbr || row.id || row.notice_id;
     const url = row.uiLink || row.url || (noticeId ? `https://sam.gov/opp/${noticeId}/view` : '');
-    const tags: string[] = ([] as string[])
-      .concat(row.naics ? row.naics : [])
-      .concat(row.naicsCodes ? row.naicsCodes : [])
-      .filter(Boolean);
+    const naics = Array.isArray(row.naics) ? row.naics : row.naics ? [row.naics] : [];
+    const naicsCodes = Array.isArray(row.naicsCodes) ? row.naicsCodes : row.naicsCodes ? [row.naicsCodes] : [];
+    const tags: string[] = [...naics, ...naicsCodes].filter(Boolean) as string[];
     const confidence = scoreConfidence(row, keywords);
     return {
       id: `sam-${noticeId}`,
@@ -358,14 +385,14 @@ async function fetchSeedSignals(): Promise<OpportunityRecord[]> {
   }));
 }
 
-function scoreConfidence(row: any, keywords: string[]) {
+function scoreConfidence(row: SamApiOpportunity, keywords: string[]) {
   const text = `${row.title || ''} ${row.description || ''}`.toLowerCase();
   if (!keywords.length) return 75;
   const hits = keywords.reduce((acc, kw) => (text.includes(kw) ? acc + 1 : acc), 0);
   return Math.min(95, 55 + hits * 10);
 }
 
-function scoreOpportunity(row: any, confidence: number) {
+function scoreOpportunity(row: SamApiOpportunity, confidence: number) {
   let score = confidence;
   if (row.responseDeadLine) {
     const due = Date.parse(row.responseDeadLine);

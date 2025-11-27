@@ -44,6 +44,40 @@ const cache: { data: MarketInsights | null; timestamp: number } = {
   timestamp: 0
 };
 
+type BlsSeriesDataPoint = {
+  value?: string;
+  periodName?: string;
+};
+
+type BlsSeries = {
+  seriesID?: string;
+  data?: BlsSeriesDataPoint[];
+};
+
+type BlsResponse = {
+  Results?: {
+    series?: BlsSeries[];
+  };
+};
+
+type NrelProject = {
+  cost_per_kw?: string | number;
+};
+
+type NrelResponse = {
+  projects?: NrelProject[];
+};
+
+type EiaSeries = {
+  data?: [string, string | number][];
+  units?: string;
+  name?: string;
+};
+
+type EiaResponse = {
+  series?: EiaSeries[];
+};
+
 const ONE_HOUR = 60 * 60 * 1000;
 
 export async function getMarketInsights(): Promise<MarketInsights> {
@@ -91,7 +125,7 @@ async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
       body: JSON.stringify(body)
     });
     if (!res.ok) throw new Error(`BLS responded ${res.status}`);
-    const json: any = await res.json();
+    const json = (await res.json()) as BlsResponse;
     const out: Record<string, PpiInsight> = {};
     for (const series of json?.Results?.series || []) {
       const meta = Object.entries(seriesMap).find(([, value]) => value.id === series.seriesID);
@@ -144,7 +178,7 @@ async function fetchNrelSolarCapex(): Promise<RenewableInsight> {
     )}&size=1&sort=cost_per_kw&order=desc`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`NREL responded ${res.status}`);
-    const json: any = await res.json();
+    const json = (await res.json()) as NrelResponse;
     const project = json?.projects?.[0];
     return {
       label: 'PV capex median',
@@ -170,7 +204,7 @@ async function fetchEiaEnergyPrice(): Promise<RenewableInsight> {
     )}&series_id=${seriesId}`;
     const res = await fetch(url);
     if (!res.ok) throw new Error(`EIA responded ${res.status}`);
-    const json: any = await res.json();
+    const json = (await res.json()) as EiaResponse;
     const series = json?.series?.[0];
     const latest = series?.data?.[0];
     return {

@@ -954,15 +954,6 @@ function setOcrProgress(value) {
   }
 }
 
-function setOcrConfidence(value) {
-  if (!ocrConfidenceEl) return;
-  if (!value && value !== 0) {
-    ocrConfidenceEl.textContent = '--';
-    return;
-  }
-  ocrConfidenceEl.textContent = `${Math.round(value)} OCR confidence`;
-}
-
 function fileToBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
