@@ -134,7 +134,7 @@ async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
       const latestValue = latest ? Number(latest.value) : null;
       const changePercent =
         latest && prior ? ((Number(latest.value) - Number(prior.value)) / Number(prior.value)) * 100 : null;
-      const key = meta?.[0] || series.seriesID;
+      const key = (meta?.[0] ?? series.seriesID ?? 'unknown') as string;
       out[key] = {
         seriesId: series.seriesID,
         latestValue,

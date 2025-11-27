@@ -38,7 +38,13 @@ export async function processWithDocumentAi(rawContent: Buffer, mimeType: string
   };
 }
 
-function buildPageTexts(document?: protos.google.cloud.documentai.v1.Document | null): string[] {
+type DocumentPayload =
+  | protos.google.cloud.documentai.v1.IDocument
+  | protos.google.cloud.documentai.v1.Document
+  | null
+  | undefined;
+
+function buildPageTexts(document?: DocumentPayload): string[] {
   if (!document) return [];
   const docText = document.text || '';
   const pages = document.pages || [];
