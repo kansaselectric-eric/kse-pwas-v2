@@ -12,7 +12,7 @@
     "@azure/msal-react": "^2.0.18",
     "@azure/msal-browser": "^3.23.0",
     "@radix-ui/react-dialog": "^1.0.5",
-    "@kse/ui": "workspace:*",
+    "@kse/ui": "file:../../packages/ui/dist",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
