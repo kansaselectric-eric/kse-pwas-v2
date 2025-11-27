@@ -61,7 +61,6 @@ const historicalCsv = document.getElementById('historicalCsv');
 const historicalMatches = document.getElementById('historicalMatches');
 const processingModeSelect = document.getElementById('processingMode');
 const ocrStatus = document.getElementById('ocrStatus');
-const ocrConfidenceEl = document.getElementById('ocrConfidence');
 const ocrProgressBar = document.getElementById('ocrProgressBar');
 const takeoffConfidence = document.getElementById('takeoffConfidence');
 const takeoffTbody = document.getElementById('takeoffTbody');
