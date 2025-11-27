@@ -80,6 +80,36 @@ type EiaResponse = {
 
 const ONE_HOUR = 60 * 60 * 1000;
 
+const BLS_SERIES_META: Record<string, { id: string; label: string }> = {
+  electrical: { id: 'PCU335A335A', label: 'Electrical equipment' },
+  copper: { id: 'WPU102', label: 'Copper base scrap' },
+  steel: { id: 'PCU331110331110', label: 'Steel mills' }
+};
+
+const FALLBACK_PPI: Record<string, PpiInsight> = {
+  electrical: {
+    seriesId: 'PCU335A335A',
+    latestValue: null,
+    changePercent: null,
+    periodName: null,
+    label: 'Electrical equipment'
+  },
+  copper: {
+    seriesId: 'WPU102',
+    latestValue: null,
+    changePercent: null,
+    periodName: null,
+    label: 'Copper base scrap'
+  },
+  steel: {
+    seriesId: 'PCU331110331110',
+    latestValue: null,
+    changePercent: null,
+    periodName: null,
+    label: 'Steel mills'
+  }
+};
+
 export async function getMarketInsights(): Promise<MarketInsights> {
   if (cache.data && Date.now() - cache.timestamp < ONE_HOUR) {
     return cache.data;
@@ -108,11 +138,7 @@ export async function getMarketInsights(): Promise<MarketInsights> {
 
 async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
   try {
-    const seriesMap: Record<string, { id: string; label: string }> = {
-      electrical: { ...defaultSeriesFallback.electrical },
-      copper: { ...defaultSeriesFallback.copper },
-      steel: { ...defaultSeriesFallback.steel }
-    };
+    const seriesMap: Record<string, { id: string; label: string }> = { ...BLS_SERIES_META };
     const body: Record<string, unknown> = {
       seriesid: Object.values(seriesMap).map((s) => s.id),
       startyear: (new Date().getFullYear() - 1).toString(),
@@ -128,15 +154,15 @@ async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
     const json = (await res.json()) as BlsResponse;
     const out: Record<string, PpiInsight> = {};
     for (const series of json?.Results?.series || []) {
-      const meta = Object.entries(seriesMap).find(([, value]) => value.id === series.seriesID);
+      const metaEntry = Object.entries(seriesMap).find(([, value]) => value.id === series.seriesID);
       const latest = series?.data?.[0];
       const prior = series?.data?.[1];
       const latestValue = latest ? Number(latest.value) : null;
       const changePercent =
         latest && prior ? ((Number(latest.value) - Number(prior.value)) / Number(prior.value)) * 100 : null;
-      const key = (meta?.[0] ?? series.seriesID ?? 'unknown') as string;
+      const key = (metaEntry?.[0] ?? series.seriesID ?? 'unknown') as string;
       const safeSeriesId = series.seriesID ?? 'UNKNOWN_SERIES';
-      const fallbackLabel = meta?.[1]?.label ?? safeSeriesId;
+      const fallbackLabel = metaEntry?.[1]?.label ?? safeSeriesId;
       out[key] = {
         seriesId: safeSeriesId,
         latestValue,
@@ -147,29 +173,7 @@ async function fetchBlsSeries(): Promise<Record<string, PpiInsight>> {
     }
     return out;
   } catch (error) {
-    return {
-      electrical: {
-        seriesId: 'PCU335A335A',
-        latestValue: null,
-        changePercent: null,
-        periodName: null,
-        label: 'Electrical equipment'
-      },
-      copper: {
-        seriesId: 'WPU102',
-        latestValue: null,
-        changePercent: null,
-        periodName: null,
-        label: 'Copper base scrap'
-      },
-      steel: {
-        seriesId: 'PCU331110331110',
-        latestValue: null,
-        changePercent: null,
-        periodName: null,
-        label: 'Steel mills'
-      }
-    };
+    return FALLBACK_PPI;
   }
 }
 
@@ -269,18 +273,6 @@ function buildNotes(
   }
   return notes;
 }
-
-const defaultSeriesFallback: Record<
-  string,
-  {
-    seriesId: string;
-    label: string;
-  }
-> = {
-  electrical: { seriesId: 'PCU335A335A', label: 'Electrical equipment' },
-  copper: { seriesId: 'WPU102', label: 'Copper base scrap' },
-  steel: { seriesId: 'PCU331110331110', label: 'Steel mills' }
-};
 
 function buildCommodityAlerts(seriesMap: Record<string, PpiInsight>): CommodityAlert[] {
   const alerts: CommodityAlert[] = [];
