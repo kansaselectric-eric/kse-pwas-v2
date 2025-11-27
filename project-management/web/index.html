@@ -21,6 +21,44 @@
       <p class="text-sm text-slate-500">Daily snapshot across Field Reports, Opportunity Radar, CRM, and Forecast.</p>
     </header>
     <main class="grid md:grid-cols-2 gap-4">
+      <section class="bg-white rounded-xl shadow p-4 md:col-span-2">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-lg font-semibold">Opportunity Scout Utilization</h2>
+            <p class="text-sm text-slate-500">Live usage pulled from the Opportunity Scout telemetry service.</p>
+          </div>
+          <button id="oppUsageRefresh" class="text-xs px-3 py-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-100">Refresh</button>
+        </div>
+        <div class="grid sm:grid-cols-4 gap-3 text-sm">
+          <article class="border border-slate-200 rounded-xl p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Scans (14d)</p>
+            <p id="oppUsageScans" class="text-2xl font-semibold text-slate-900">--</p>
+          </article>
+          <article class="border border-slate-200 rounded-xl p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Watch Runs</p>
+            <p id="oppUsageWatch" class="text-2xl font-semibold text-slate-900">--</p>
+          </article>
+          <article class="border border-slate-200 rounded-xl p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Exports</p>
+            <p id="oppUsageExports" class="text-2xl font-semibold text-slate-900">--</p>
+          </article>
+          <article class="border border-slate-200 rounded-xl p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Estimator Sends</p>
+            <p id="oppUsageEstimator" class="text-2xl font-semibold text-slate-900">--</p>
+          </article>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Activity Timeline</p>
+          <div id="oppUsageTimeline" class="grid sm:grid-cols-4 gap-2 mt-2"></div>
+          <p id="oppUsageTimelineEmpty" class="text-sm text-slate-500">Awaiting activity...</p>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Latest Actions</p>
+          <ul id="oppUsageEvents" class="mt-2 space-y-1 text-sm text-slate-700"></ul>
+          <p id="oppUsageEventsEmpty" class="text-sm text-slate-500">No events yet.</p>
+        </div>
+        <p id="oppUsageStatus" class="text-xs text-slate-500 mt-3"></p>
+      </section>
       <section class="bg-white rounded-xl shadow p-4">
         <h2 class="text-lg font-semibold mb-2">Field Reports (7d)</h2>
         <ul class="text-sm">

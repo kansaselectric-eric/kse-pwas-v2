@@ -40,12 +40,93 @@
       <p class="text-sm text-slate-100">OCR-enhanced take-offs with historical pricing context.</p>
     </header>
 
+    <section id="opportunityBanner" class="hidden mb-4 bg-emerald-50 border border-emerald-200 text-emerald-900 rounded-xl p-4 flex flex-wrap items-start justify-between gap-3">
+      <div>
+        <p class="text-xs uppercase tracking-wide text-emerald-600 font-semibold">Forwarded Opportunity</p>
+        <p id="opportunityTitle" class="text-lg font-semibold mt-1"></p>
+        <p id="opportunitySummary" class="text-sm text-emerald-800 mt-1"></p>
+      </div>
+      <div class="flex gap-2">
+        <a id="opportunityLink" class="text-xs px-3 py-1.5 rounded bg-emerald-600 text-white hover:bg-emerald-700" href="#" target="_blank" rel="noopener">Open Source</a>
+        <button id="opportunityDismiss" class="text-xs px-3 py-1.5 rounded border border-emerald-300 text-emerald-800 hover:bg-emerald-100">Dismiss</button>
+      </div>
+    </section>
+
     <main class="grid gap-4">
+      <section class="bg-white rounded-xl shadow p-4">
+        <div class="flex items-center justify-between">
+          <h2 class="text-lg font-semibold">Market Intelligence</h2>
+          <button id="marketRefresh" class="text-xs px-3 py-1 rounded bg-slate-100 text-slate-700 hover:bg-slate-200">Refresh</button>
+        </div>
+        <div id="marketPanel" class="grid md:grid-cols-2 lg:grid-cols-4 gap-3 mt-3 text-sm">
+          <article class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Material Escalation</p>
+            <p id="marketPpiValue" class="text-xl font-semibold text-slate-900">--</p>
+            <p id="marketPpiMeta" class="text-xs text-slate-500">BLS PPI</p>
+          </article>
+          <article class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">PV Capex Median</p>
+            <p id="marketSolarValue" class="text-xl font-semibold text-slate-900">--</p>
+            <p id="marketSolarMeta" class="text-xs text-slate-500">NREL</p>
+          </article>
+          <article class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Energy Price</p>
+            <p id="marketEnergyValue" class="text-xl font-semibold text-slate-900">--</p>
+            <p id="marketEnergyMeta" class="text-xs text-slate-500">EIA</p>
+          </article>
+          <article class="rounded-lg border border-slate-200 p-3">
+            <p class="text-xs uppercase text-slate-500 font-semibold">Interconnection</p>
+            <p id="marketInterconnectionValue" class="text-xl font-semibold text-slate-900">--</p>
+            <p id="marketInterconnectionMeta" class="text-xs text-slate-500">FERC / ISO</p>
+          </article>
+        </div>
+        <ul id="marketNotes" class="mt-3 list-disc pl-5 text-sm text-slate-600"></ul>
+        <div id="marketCommodityPanel" class="mt-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Commodity Alerts</h3>
+            <span id="marketCommodityTimestamp" class="text-xs text-slate-400"></span>
+          </div>
+          <div id="marketCommodityList" class="mt-2 grid md:grid-cols-2 gap-2"></div>
+          <p id="marketCommodityEmpty" class="text-sm text-slate-500 mt-2">No commodity signals yet.</p>
+        </div>
+        <div id="marketRecPanel" class="mt-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-slate-700 uppercase tracking-wide">Strategic Recommendations</h3>
+            <span id="marketRecTimestamp" class="text-xs text-slate-400"></span>
+          </div>
+          <ul id="marketRecommendations" class="mt-2 space-y-1 text-sm text-slate-700"></ul>
+          <p id="marketRecommendationsEmpty" class="text-sm text-slate-500 mt-2">No recommendations generated yet.</p>
+        </div>
+      </section>
+
       <section class="bg-white rounded-xl shadow p-4">
         <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-3">
           <label class="text-sm font-medium">Upload RFP file</label>
-          <input id="rfpFile" type="file" accept=".txt,.pdf,.docx,.png,.jpg,.jpeg" class="text-sm">
+          <input id="rfpFile" type="file" multiple accept=".txt,.pdf,.docx,.png,.jpg,.jpeg" class="text-sm">
           <span id="fileStatus" class="text-xs text-slate-500"></span>
+        </div>
+        <div id="fileInsightPanel" class="mt-3 border border-slate-200 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 hidden">
+          <div class="flex items-center justify-between gap-2">
+            <p class="font-semibold text-slate-700">File Intake Diagnostics</p>
+            <span id="fileInsightMeta" class="text-slate-500"></span>
+          </div>
+          <ul id="fileInsightList" class="mt-2 space-y-1"></ul>
+          <p id="fileWarnings" class="mt-2 text-amber-600 font-medium hidden"></p>
+        </div>
+        <div class="mt-3 border border-dashed border-slate-300 rounded-lg p-3 bg-white/60">
+          <div class="flex items-center justify-between text-xs uppercase text-slate-500 font-semibold mb-2">
+            <span>File Manifest</span>
+            <span id="fileManifestSummary">0 files</span>
+          </div>
+          <ul id="fileManifestList" class="space-y-1 text-sm text-slate-700"></ul>
+          <p id="fileManifestEmpty" class="text-sm text-slate-500">Drop multiple specs to build a manifest queue.</p>
+        </div>
+        <div id="pagePreviewPanel" class="mt-3 border border-slate-200 rounded-lg bg-white p-3 text-sm text-slate-700 hidden">
+          <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <p class="text-xs uppercase font-semibold text-slate-500">Source Preview</p>
+            <select id="pagePreviewSelect" class="text-xs rounded border-slate-300"></select>
+          </div>
+          <pre id="pagePreviewBody" class="text-xs whitespace-pre-wrap max-h-48 overflow-auto bg-slate-50 rounded p-2"></pre>
         </div>
         <label class="block text-sm font-medium mb-1" for="rfpText">RFP Text</label>
         <textarea id="rfpText" rows="10" placeholder="Paste RFP content here..." class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500"></textarea>
@@ -109,6 +190,13 @@
           <button id="saveDict" class="px-3 py-1.5 rounded btn-primary text-sm">Save Dictionaries</button>
           <button id="resetDict" class="px-3 py-1.5 rounded btn-neutral text-sm">Reset to Preset</button>
         </div>
+        <div id="dictSuggestionsPanel" class="mt-3 border border-slate-200 rounded-lg bg-slate-50 p-3 text-xs text-slate-600 hidden">
+          <div class="flex items-center justify-between">
+            <span class="font-semibold text-slate-600">Suggested terms</span>
+            <button id="refreshSuggestions" class="text-sky-600">Refresh</button>
+          </div>
+          <ul id="dictSuggestionsList" class="mt-2 space-y-1"></ul>
+        </div>
       </section>
 
       <section class="bg-white rounded-xl shadow p-4">
@@ -154,6 +242,8 @@
                 <th class="py-2 pr-3 text-left">Category</th>
                 <th class="py-2 pr-3 text-left">Complexity</th>
                 <th class="py-2 pr-3 text-left">Matched Terms</th>
+                <th class="py-2 pr-3 text-left">Confidence</th>
+                <th class="py-2 pr-3 text-left">Source</th>
                 <th class="py-2 text-right">Price Hint</th>
               </tr>
             </thead>
@@ -163,6 +253,76 @@
         <p id="takeoffEmpty" class="text-sm text-slate-500 mt-3">Run an analysis to generate a structured take-off.</p>
         <div class="mt-3 flex gap-2">
           <button id="takeoffCsvBtn" class="px-4 py-2 rounded-lg bg-slate-900 text-white disabled:opacity-40" disabled>Export Take-off CSV</button>
+          <button id="takeoffPdfBtn" class="px-4 py-2 rounded-lg bg-slate-100 text-slate-700 disabled:opacity-40" disabled>Export Take-off PDF</button>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-xl shadow p-4">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <div>
+            <h2 class="text-lg font-semibold">Estimator QA</h2>
+            <p class="text-xs text-slate-500">Confidence mix and items that need a human double-check.</p>
+          </div>
+          <div class="text-right">
+            <p class="text-xs uppercase text-slate-500">Review Needed</p>
+            <p id="qaReviewTotal" class="text-xl font-semibold text-amber-600">--</p>
+          </div>
+        </div>
+        <button id="qaCopyIssues" class="mb-3 text-xs px-3 py-1.5 rounded bg-slate-100 text-slate-700 hover:bg-slate-200">Copy Issue List</button>
+        <div class="grid sm:grid-cols-3 gap-3 text-sm">
+          <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-3">
+            <p class="text-xs uppercase text-emerald-600 font-semibold">High Confidence</p>
+            <p id="qaHighCount" class="text-2xl font-bold text-emerald-800">0</p>
+          </div>
+          <div class="rounded-lg border border-sky-100 bg-sky-50 p-3">
+            <p class="text-xs uppercase text-sky-600 font-semibold">Medium Confidence</p>
+            <p id="qaMediumCount" class="text-2xl font-bold text-sky-800">0</p>
+          </div>
+          <div class="rounded-lg border border-amber-100 bg-amber-50 p-3">
+            <p class="text-xs uppercase text-amber-600 font-semibold">Needs Review</p>
+            <p id="qaReviewCount" class="text-2xl font-bold text-amber-800">0</p>
+          </div>
+        </div>
+        <div class="mt-4">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Flagged Items</p>
+          <ul id="qaIssueList" class="mt-2 space-y-1 text-sm text-slate-700"></ul>
+          <p id="qaIssueEmpty" class="text-sm text-slate-500 mt-2">No issues detected. This take-off looks clean.</p>
+        </div>
+      </section>
+
+      <section class="bg-white rounded-xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Item Inspector</h2>
+        <p id="itemInspectorEmpty" class="text-sm text-slate-500">Select a take-off line to review and edit.</p>
+        <p id="itemInspectorSource" class="text-xs text-slate-500 hidden mb-2"></p>
+        <div id="itemInspectorFields" class="hidden grid gap-3 sm:grid-cols-2 text-sm">
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-slate-500">Description</span>
+            <textarea id="inspectorDescription" rows="3" class="rounded border-slate-300"></textarea>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-slate-500">Notes</span>
+            <textarea id="inspectorNotes" rows="3" class="rounded border-slate-300" placeholder="Why did you edit this?"></textarea>
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-slate-500">Quantity</span>
+            <input id="inspectorQuantity" type="number" step="0.01" class="rounded border-slate-300">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-slate-500">Unit</span>
+            <input id="inspectorUnit" type="text" class="rounded border-slate-300">
+          </label>
+          <label class="flex flex-col gap-1">
+            <span class="text-xs font-semibold text-slate-500">Category</span>
+            <input id="inspectorCategory" type="text" class="rounded border-slate-300">
+          </label>
+          <div class="flex items-end gap-2">
+            <button id="inspectorSave" class="px-4 py-2 rounded bg-sky-600 text-white">Save Edit</button>
+            <button id="inspectorAccept" class="px-4 py-2 rounded bg-emerald-600 text-white">Mark Reviewed</button>
+          </div>
+        </div>
+        <div class="mt-3">
+          <p class="text-xs uppercase text-slate-500 font-semibold">Feedback Log</p>
+          <ul id="feedbackLog" class="mt-1 space-y-1 text-xs text-slate-600"></ul>
         </div>
       </section>
 
@@ -181,6 +341,10 @@
         <div class="mt-4">
           <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Bid Leaderboard</h3>
           <div id="historicalLeaderboard" class="mt-2 grid gap-2 text-sm"></div>
+        </div>
+        <div class="mt-4">
+          <h3 class="text-sm font-semibold text-slate-500 uppercase tracking-wide">Unmatched Items</h3>
+          <ul id="historicalGaps" class="mt-2 space-y-1 text-sm text-slate-700"></ul>
         </div>
       </section>
 

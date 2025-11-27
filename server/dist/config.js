@@ -12,6 +12,22 @@ export const config = {
         token: process.env.ACU_TOKEN || '',
         tenant: process.env.ACU_TENANT || ''
     },
+    docAi: {
+        projectId: process.env.DOC_AI_PROJECT_ID || '',
+        location: process.env.DOC_AI_LOCATION || '',
+        processorId: process.env.DOC_AI_PROCESSOR_ID || ''
+    },
+    opportunities: {
+        samApiKey: process.env.SAM_API_KEY || '',
+        defaultKeywords: (process.env.OPP_DEFAULT_KEYWORDS || 'substation,renewable,data center,utility,industrial').split(',').map((w) => w.trim()).filter(Boolean),
+        rssFeeds: (process.env.OPP_RSS_FEEDS ||
+            'https://news.google.com/rss/search?q=Kansas%20expansion%20construction&hl=en-US&gl=US&ceid=US:en,https://www.constructionequipmentguide.com/rss/industry-news').split(',').map((url) => url.trim()).filter(Boolean)
+    },
+    market: {
+        blsApiKey: process.env.BLS_API_KEY || '',
+        nrelApiKey: process.env.NREL_API_KEY || 'DEMO_KEY',
+        eiaApiKey: process.env.EIA_API_KEY || 'DEMO_KEY'
+    },
     auth: {
         jwtSecret: process.env.JWT_SECRET || 'kse-dev-secret',
         refreshSecret: process.env.JWT_REFRESH_SECRET || 'kse-dev-refresh-secret',

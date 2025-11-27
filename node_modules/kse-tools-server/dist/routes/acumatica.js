@@ -9,12 +9,13 @@ acumaticaRouter.get('/projects', async (_req, res) => {
             return res.status(400).json({ ok: false, error: 'Missing Acumatica config' });
         const headers = { Authorization: `Bearer ${token}`, Accept: 'application/json' };
         if (tenant)
-            headers['Tenant'] = tenant;
+            headers.Tenant = tenant;
         const url = `${baseUrl.replace(/\/+$/, '')}/entity/Default/20.200.001/Project?$select=ProjectID,Description,Status&$top=200`;
         const r = await axios.get(url, { headers });
         res.json({ ok: true, items: r.data });
     }
     catch (e) {
-        res.status(500).json({ ok: false, error: String(e?.message || e) });
+        const message = e instanceof Error ? e.message : String(e);
+        res.status(500).json({ ok: false, error: message });
     }
 });

@@ -10,6 +10,9 @@ import { acumaticaRouter } from './routes/acumatica.js';
 import { authRouter } from './routes/auth.js';
 import { aiRouter } from './routes/ai.js';
 import { crmRouter } from './routes/crm.js';
+import { ocrRouter } from './routes/ocr.js';
+import { marketRouter } from './routes/market.js';
+import { opportunitiesRouter } from './routes/opportunities.js';
 import { initSentry, Sentry } from './sentry.js';
 import { config } from './config.js';
 export const app = express();
@@ -18,7 +21,7 @@ const corsOptions = config.auth.allowedOrigins.length
     ? { origin: config.auth.allowedOrigins, credentials: true }
     : undefined;
 app.use(cors(corsOptions));
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '30mb' }));
 app.use(helmet());
 app.use(rateLimit({ windowMs: 60 * 1000, max: 100 }));
 app.use(morgan('tiny'));
@@ -33,6 +36,9 @@ app.use('/api/acumatica', acumaticaRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', aiRouter);
 app.use('/api', crmRouter);
+app.use('/api/ocr', ocrRouter);
+app.use('/api/market', marketRouter);
+app.use('/api/opportunities', opportunitiesRouter);
 app.get('/', (_req, res) => {
     res.json({ ok: true, service: 'kse-tools-server' });
 });

@@ -10,12 +10,35 @@ const APP_NAME = 'kse-field-reports';
 const DB_NAME = 'kse-field-reports';
 const STORE_NAME = 'reportsQueue';
 // Feature flags
-const ENABLE_IMAGE_COMPRESSION = true;
-const ENABLE_CHUNKED_UPLOADS = true; // Chunked uploads enabled
+let enableImageCompression = true;
+let enableChunkedUploads = true; // Chunked uploads enabled
+const featureFlagHost = typeof window !== 'undefined' ? window : typeof globalThis !== 'undefined' ? globalThis : null;
+if (featureFlagHost) {
+  Object.defineProperty(featureFlagHost, 'ENABLE_IMAGE_COMPRESSION', {
+    configurable: true,
+    get: () => enableImageCompression,
+    set: (val) => {
+      enableImageCompression = !!val;
+    }
+  });
+  Object.defineProperty(featureFlagHost, 'ENABLE_CHUNKED_UPLOADS', {
+    configurable: true,
+    get: () => enableChunkedUploads,
+    set: (val) => {
+      enableChunkedUploads = !!val;
+    }
+  });
+}
 // TODO: Replace with your deployed Apps Script Web App URL
 const APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/YOUR_APPS_SCRIPT_WEB_APP_URL/exec';
 // TODO: Replace with your Google Client ID
 const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com';
+const PROCUREMENT_EMAIL = 'procurement@kansaselectric.com';
+const TECH_ROSTER_KEY = 'kse_field_roster';
+const TECH_ASSIGNMENTS_KEY = 'kse_project_assignments';
+const LAST_TECH_KEY = 'kse_last_field_tech';
+const PROMPT_LIBRARY_KEY = 'kse_prompt_library';
+const DEFAULT_CREW_RATE = 85;
 
 if (typeof document !== 'undefined' && document.title === '') {
   document.title = APP_NAME;
@@ -57,6 +80,56 @@ const taskSelect = document.getElementById('task');
 const syncTasksBtn = document.getElementById('syncTasksBtn');
 const qtyCompletedInput = document.getElementById('qtyCompleted');
 const pctTodayInput = document.getElementById('pctToday');
+const photosInput = document.getElementById('photos');
+const videosInput = document.getElementById('videos');
+const manpowerInput = document.getElementById('manpower');
+const safetyCheckbox = document.getElementById('safetyIssues');
+const notesInput = document.getElementById('notes');
+const narrativeWorkInput = document.getElementById('narrativeWork');
+const narrativeMaterialsInput = document.getElementById('narrativeMaterials');
+const narrativeIssuesInput = document.getElementById('narrativeIssues');
+const narrativeLookaheadInput = document.getElementById('narrativeLookahead');
+const narrativeInputMap = {
+  work: narrativeWorkInput,
+  materials: narrativeMaterialsInput,
+  issues: narrativeIssuesInput,
+  lookahead: narrativeLookaheadInput
+};
+const summaryPreviewEl = document.getElementById('summaryPreview');
+const summaryCopyBtn = document.getElementById('summaryCopy');
+const fieldTechSelect = document.getElementById('fieldTechSelect');
+const manageTechBtn = document.getElementById('manageTechBtn');
+const metricQueuedReports = document.getElementById('metricQueuedReports');
+const metricPhotos = document.getElementById('metricPhotos');
+const metricVideos = document.getElementById('metricVideos');
+const metricAudio = document.getElementById('metricAudio');
+const crewHoursInput = document.getElementById('crewHours');
+const crewCostLensEl = document.getElementById('crewCostLens');
+const crewCostDetailEl = document.getElementById('crewCostDetail');
+if (crewHoursInput && !crewHoursInput.value) crewHoursInput.value = '8';
+const requestCard = document.getElementById('requestIntelligence');
+const requestListEl = document.getElementById('requestList');
+const requestSendBtn = document.getElementById('requestSendBtn');
+const narrationOverlay = document.getElementById('narrationOverlay');
+const promptPresetSelect = document.getElementById('promptPresetSelect');
+const managePromptsBtn = document.getElementById('managePromptsBtn');
+const promptChipRow = document.getElementById('promptChipRow');
+const assignTechDialog = document.getElementById('assignTechDialog');
+const assignTechList = document.getElementById('assignTechList');
+const assignTechProjectLabel = document.getElementById('assignTechProjectLabel');
+const newTechInput = document.getElementById('newTechInput');
+const addTechBtn = document.getElementById('addTechBtn');
+const assignTechSave = document.getElementById('assignTechSave');
+const assignTechCancel = document.getElementById('assignTechCancel');
+const promptManagerDialog = document.getElementById('promptManagerDialog');
+const promptManagerList = document.getElementById('promptManagerList');
+const promptManagerLabel = document.getElementById('promptManagerLabel');
+const newPromptLabel = document.getElementById('newPromptLabel');
+const newPromptText = document.getElementById('newPromptText');
+const newPromptTarget = document.getElementById('newPromptTarget');
+const addPromptBtn = document.getElementById('addPromptBtn');
+const promptManagerSave = document.getElementById('promptManagerSave');
+const promptManagerCancel = document.getElementById('promptManagerCancel');
 
 let mediaRecorder = null;
 let audioChunks = [];
@@ -70,6 +143,590 @@ let videoMediaRecorder = null;
 let videoStream = null;
 let videoChunks = [];
 let capturedVideoBlobs = [];
+let assignProjectKey = '';
+let promptManagerProjectKey = '';
+const capturedAnnotatedImageBlobs = [];
+const insightMetrics = { queued: 0, photos: 0, videos: 0, audio: 0 };
+const BUILT_IN_PROMPTS = {
+  general: [
+    { label: 'Feeder install', target: 'work', text: 'Pulled feeders between MH-12 and MH-15, terminated in gear.' },
+    { label: 'Gear set', target: 'materials', text: 'Set and wired ATS, verified torque, labeled conductors.' },
+    { label: 'Conflict', target: 'issues', text: 'Delayed finish on ductbank due to conflicting telecom, awaiting GC clearance.' },
+    { label: 'Crew ask', target: 'lookahead', text: 'Need two additional journeymen tomorrow to pull Section B feeders.' }
+  ],
+  substation: [
+    { label: 'Yard grounding', target: 'work', text: 'Completed new ground grid ties on the south bay and meggered connections.' },
+    { label: 'Relay panels', target: 'materials', text: 'Mounted relay panels R1-R3, landed control wiring, labeled test switches.' },
+    { label: 'Outage plan', target: 'issues', text: 'Coordinating cutover with utility ops — waiting on outage window confirmation.' },
+    { label: 'Breaker delivery', target: 'lookahead', text: 'Need 161kV breaker #2 delivered by Friday to stay on energization track.' }
+  ],
+  solar: [
+    { label: 'Tracker strings', target: 'work', text: 'Energized four tracker rows, torque-checked module clamps, verified polarity.' },
+    { label: 'Inverter pads', target: 'materials', text: 'Placed precast inverter pads and staged combiner wiring harnesses.' },
+    { label: 'Weather watch', target: 'issues', text: 'High winds halted string pull for 2 hours; resuming tomorrow morning.' },
+    { label: 'Module drop', target: 'lookahead', text: 'Request truck #12 with 500 modules early AM to backfill Row 17 shortage.' }
+  ],
+  data: [
+    { label: 'Busway run', target: 'work', text: 'Installed 2nd level busway and tied into UPS gallery, torque verified.' },
+    { label: 'White space gear', target: 'materials', text: 'Staged PDUs + RPPs for Pod B, barcode scanned for QA handoff.' },
+    { label: 'Access constraints', target: 'issues', text: 'Hot aisle containment delayed our lift; coordinating night shift access.' },
+    { label: 'Owner change', target: 'lookahead', text: 'Need approval on revised whips length before prefabs ship Friday.' }
+  ],
+  service: [
+    { label: 'Emergency call', target: 'work', text: 'Troubleshot loss of power to RTU-4, replaced failed breaker and restored service.' },
+    { label: 'Parts swapped', target: 'materials', text: 'Used spare VFD from truck stock; need replacement ordered to restock.' },
+    { label: 'Safety follow-up', target: 'issues', text: 'Panel had missing deadfront; notified customer and tagged out until fixed.' },
+    { label: 'Next visit', target: 'lookahead', text: 'Schedule return visit Thursday with thermal camera to finish inspection.' }
+  ],
+  underground: [
+    { label: 'Ductbank pour', target: 'work', text: 'Poured 80’ of 8-way ductbank with spacers, installed warning tape.' },
+    { label: 'Vault set', target: 'materials', text: 'Set precast vault V-3, stubbed conduits, foamed penetrations.' },
+    { label: 'Utility conflicts', target: 'issues', text: 'Encountered unmarked water service crossing at Sta. 14+50, awaiting relocation.' },
+    { label: 'Pull schedule', target: 'lookahead', text: 'Need pulling rig + 6 crew on Monday to get feeders in before backfill.' }
+  ]
+};
+let flaggedRequests = [];
+
+function refreshInsightMetrics() {
+  if (metricQueuedReports) metricQueuedReports.textContent = String(insightMetrics.queued);
+  if (metricPhotos) metricPhotos.textContent = String(insightMetrics.photos);
+  if (metricVideos) metricVideos.textContent = String(insightMetrics.videos);
+  if (metricAudio) metricAudio.textContent = String(insightMetrics.audio);
+}
+
+function recomputeMediaMetrics() {
+  insightMetrics.photos = (photosInput?.files?.length || 0) + capturedAnnotatedImageBlobs.length;
+  insightMetrics.videos = (videosInput?.files?.length || 0) + capturedVideoBlobs.length;
+  insightMetrics.audio = capturedAudioBlobs.length;
+  refreshInsightMetrics();
+}
+refreshInsightMetrics();
+updateCrewCostLens();
+
+function getProjectKey() {
+  if (!projectSelect) return '';
+  const opt = projectSelect.options[projectSelect.selectedIndex];
+  if (!opt) return '';
+  if (opt.dataset?.jobid) return `job:${opt.dataset.jobid}`;
+  if (opt.dataset?.custom) return `custom:${opt.textContent || opt.value}`;
+  return opt.value || '';
+}
+
+function getProjectLabel() {
+  if (!projectSelect) return '';
+  const opt = projectSelect.options[projectSelect.selectedIndex];
+  return opt ? (opt.textContent || opt.value || '') : '';
+}
+
+function loadTechRoster() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TECH_ROSTER_KEY) || '[]');
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveTechRoster(list) {
+  localStorage.setItem(TECH_ROSTER_KEY, JSON.stringify(list));
+}
+
+function loadTechAssignments() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TECH_ASSIGNMENTS_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveTechAssignments(assignments) {
+  localStorage.setItem(TECH_ASSIGNMENTS_KEY, JSON.stringify(assignments));
+}
+
+function getAssignmentsForCurrentProject() {
+  const key = getProjectKey();
+  const assignments = loadTechAssignments();
+  return key && assignments[key] ? assignments[key] : [];
+}
+
+function populateFieldTechDropdown() {
+  if (!fieldTechSelect) return;
+  const projectAssignments = getAssignmentsForCurrentProject();
+  const roster = loadTechRoster();
+  const candidates = projectAssignments.length ? projectAssignments : roster;
+  fieldTechSelect.innerHTML = '';
+  const placeholder = document.createElement('option');
+  placeholder.value = '';
+  placeholder.textContent = candidates.length ? 'Tap to select your name...' : 'Roster not set yet';
+  fieldTechSelect.appendChild(placeholder);
+  candidates.forEach((name) => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    fieldTechSelect.appendChild(opt);
+  });
+  const last = localStorage.getItem(LAST_TECH_KEY);
+  if (last && candidates.includes(last)) {
+    fieldTechSelect.value = last;
+  }
+}
+
+function loadPromptLibrary() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(PROMPT_LIBRARY_KEY) || '{}');
+    return parsed && typeof parsed === 'object' ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+function savePromptLibrary(library) {
+  localStorage.setItem(PROMPT_LIBRARY_KEY, JSON.stringify(library));
+}
+
+function getProjectPrompts(projectKey) {
+  if (!projectKey) return [];
+  const lib = loadPromptLibrary();
+  const prompts = lib[projectKey];
+  return Array.isArray(prompts) ? prompts : [];
+}
+
+function getPromptSet(key) {
+  if (key === 'project') {
+    return getProjectPrompts(getProjectKey());
+  }
+  return BUILT_IN_PROMPTS[key] || BUILT_IN_PROMPTS.general;
+}
+
+function renderPromptChips(presetKey = (promptPresetSelect?.value || 'general')) {
+  if (!promptChipRow) return;
+  promptChipRow.innerHTML = '';
+  const prompts = getPromptSet(presetKey) || [];
+  if (!prompts.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-xs text-slate-500';
+    empty.textContent = 'No prompts saved for this project yet.';
+    promptChipRow.appendChild(empty);
+    return;
+  }
+  prompts.forEach((prompt) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'guided-chip';
+    btn.dataset.target = prompt.target;
+    btn.dataset.text = prompt.text;
+    btn.textContent = prompt.label;
+    promptChipRow.appendChild(btn);
+  });
+}
+
+function loadPromptManagerState(projectKey) {
+  return getProjectPrompts(projectKey);
+}
+
+function saveProjectPrompts(projectKey, prompts) {
+  if (!projectKey) return;
+  const lib = loadPromptLibrary();
+  lib[projectKey] = prompts;
+  savePromptLibrary(lib);
+}
+
+function renderPromptManagerList(projectKey) {
+  if (!promptManagerList) return;
+  const prompts = loadPromptManagerState(projectKey);
+  promptManagerList.innerHTML = '';
+  if (!prompts.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-xs text-slate-500';
+    empty.textContent = 'No project-specific prompts yet.';
+    promptManagerList.appendChild(empty);
+    return;
+  }
+  prompts.forEach((prompt) => {
+    const row = document.createElement('div');
+    row.className = 'border border-slate-200 rounded-lg p-2 text-sm flex items-start justify-between gap-2';
+    const copy = document.createElement('div');
+    copy.innerHTML = `<p class="font-semibold text-slate-700">${prompt.label}</p>
+      <p class="text-xs text-slate-500 uppercase">${prompt.target}</p>
+      <p class="text-xs text-slate-600">${prompt.text}</p>`;
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'text-xs text-rose-600 hover:text-rose-500';
+    remove.dataset.removePrompt = prompt.id;
+    remove.textContent = 'Remove';
+    row.appendChild(copy);
+    row.appendChild(remove);
+    promptManagerList.appendChild(row);
+  });
+}
+
+function getCrewCostSnapshot() {
+  const manpowerVal = Number(manpowerInput?.value || 0);
+  const hoursVal = Number(crewHoursInput?.value || 0);
+  const rateVal = DEFAULT_CREW_RATE;
+  const totalHours = manpowerVal * hoursVal;
+  const dailyCost = totalHours * rateVal;
+  return { manpower: manpowerVal, hours: hoursVal, rate: rateVal, totalHours, dailyCost };
+}
+
+function formatCurrency(val) {
+  return Number(val || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+}
+
+function updateCrewCostLens() {
+  if (!crewCostLensEl || !crewCostDetailEl) return;
+  const snapshot = getCrewCostSnapshot();
+  if (snapshot.dailyCost > 0) {
+    crewCostLensEl.textContent = `≈ $${formatCurrency(snapshot.dailyCost)} burn today`;
+    const totalHrs = Number.isFinite(snapshot.totalHours) ? snapshot.totalHours.toFixed(1) : '0';
+    crewCostDetailEl.textContent = `${snapshot.manpower} crew × ${snapshot.hours || 0} hrs (${totalHrs} total hrs) • Rate handled automatically`;
+  } else {
+    crewCostLensEl.textContent = 'Set crew + hours to surface daily burn.';
+    crewCostDetailEl.textContent = '';
+  }
+}
+
+const REQUEST_KEYWORDS = ['need', 'request', 'deliver', 'ship', 'await', 'missing', 'crew', 'material', 'prefab', 'rental', 'tool', 'order'];
+
+function extractActionableRequests(text) {
+  if (!text) return [];
+  return text
+    .split(/[\n.]/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .filter((line) => {
+      const lower = line.toLowerCase();
+      return REQUEST_KEYWORDS.some((kw) => lower.includes(kw));
+    });
+}
+
+function updateRequestIntelligence() {
+  if (!requestCard || !requestListEl) return;
+  const narrative = getNarrativeState();
+  flaggedRequests = extractActionableRequests(narrative.lookahead || '');
+  requestListEl.innerHTML = '';
+  if (!flaggedRequests.length) {
+    requestCard.classList.add('hidden');
+    if (requestSendBtn) requestSendBtn.disabled = true;
+    return;
+  }
+  requestCard.classList.remove('hidden');
+  if (requestSendBtn) requestSendBtn.disabled = false;
+  flaggedRequests.forEach((req) => {
+    const li = document.createElement('li');
+    li.textContent = req;
+    requestListEl.appendChild(li);
+  });
+}
+
+const OVERLAY_FIELD_MAP = {
+  work: 'workCompleted',
+  materials: 'materialsInstalled',
+  issues: 'issuesRisks',
+  lookahead: 'lookahead'
+};
+
+function refreshOverlayStateFromNarratives() {
+  if (!narrationOverlay) return;
+  const narrative = getNarrativeState();
+  narrationOverlay.querySelectorAll('.overlay-pill').forEach((pill) => {
+    const key = pill.dataset.target;
+    if (!key) return;
+    const fieldKey = OVERLAY_FIELD_MAP[key];
+    const hasText = fieldKey && narrative[fieldKey] && narrative[fieldKey].length > 0;
+    pill.classList.toggle('is-complete', !!hasText);
+  });
+}
+
+function resetNarrationOverlay() {
+  if (!narrationOverlay) return;
+  narrationOverlay.querySelectorAll('.overlay-pill').forEach((pill) => pill.classList.remove('is-complete'));
+}
+
+function notifyProcurementOfRequests() {
+  if (!flaggedRequests.length) return;
+  const projectName = getProjectLabel() || 'Field project';
+  const summary = flaggedRequests.map((req) => `- ${req}`).join('\n');
+  const subject = encodeURIComponent(`[Field Request] ${projectName}`);
+  const body = encodeURIComponent(`Project: ${projectName}\n\nRequests:\n${summary}\n\nSent via Kansas Electric Field Reports PWA`);
+  window.location.href = `mailto:${PROCUREMENT_EMAIL}?subject=${subject}&body=${body}`;
+}
+
+function renderAssignTechList(projectKey) {
+  if (!assignTechList) return;
+  const roster = loadTechRoster();
+  const assigned = new Set(loadTechAssignments()[projectKey] || []);
+  assignTechList.innerHTML = '';
+  if (!roster.length) {
+    const empty = document.createElement('p');
+    empty.className = 'text-xs text-slate-500';
+    empty.textContent = 'No roster yet. Add names below.';
+    assignTechList.appendChild(empty);
+    return;
+  }
+  roster.forEach((name) => {
+    const row = document.createElement('label');
+    row.className = 'flex items-center justify-between border border-slate-200 rounded-lg px-3 py-2 text-sm';
+    row.innerHTML = `<span>${name}</span>`;
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.className = 'rounded border-slate-300 text-sky-600 focus:ring-sky-500';
+    checkbox.dataset.name = name;
+    checkbox.checked = assigned.has(name);
+    row.appendChild(checkbox);
+    assignTechList.appendChild(row);
+  });
+}
+
+function openAssignTechManager() {
+  const projectKey = getProjectKey();
+  if (!projectKey) {
+    alert('Select a project first.');
+    return;
+  }
+  assignProjectKey = projectKey;
+  if (assignTechProjectLabel) {
+    assignTechProjectLabel.textContent = `Project: ${getProjectLabel()}`;
+  }
+  renderAssignTechList(projectKey);
+  assignTechDialog?.showModal();
+}
+
+function openPromptManager() {
+  const projectKey = getProjectKey();
+  if (!projectKey) {
+    alert('Select a project first.');
+    return;
+  }
+  promptManagerProjectKey = projectKey;
+  if (promptManagerLabel) {
+    promptManagerLabel.textContent = `Project: ${getProjectLabel()}`;
+  }
+  renderPromptManagerList(projectKey);
+  promptManagerDialog?.showModal();
+}
+
+function addProjectPromptFromDialog() {
+  if (!promptManagerProjectKey) return;
+  const label = (newPromptLabel?.value || '').trim();
+  const text = (newPromptText?.value || '').trim();
+  const target = newPromptTarget?.value || 'work';
+  if (!label || !text) return;
+  const current = getProjectPrompts(promptManagerProjectKey);
+  current.push({
+    id: `prompt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    label,
+    text,
+    target
+  });
+  saveProjectPrompts(promptManagerProjectKey, current);
+  newPromptLabel.value = '';
+  newPromptText.value = '';
+  renderPromptManagerList(promptManagerProjectKey);
+  if ((promptPresetSelect?.value || '') === 'project') {
+    renderPromptChips('project');
+  }
+}
+
+function removeProjectPrompt(projectKey, promptId) {
+  if (!projectKey || !promptId) return;
+  const current = getProjectPrompts(projectKey).filter((prompt) => prompt.id !== promptId);
+  saveProjectPrompts(projectKey, current);
+  renderPromptManagerList(projectKey);
+  if ((promptPresetSelect?.value || '') === 'project') {
+    renderPromptChips('project');
+  }
+}
+
+function getNarrativeState() {
+  return {
+    workCompleted: (narrativeWorkInput?.value || '').trim(),
+    materialsInstalled: (narrativeMaterialsInput?.value || '').trim(),
+    issuesRisks: (narrativeIssuesInput?.value || '').trim(),
+    lookahead: (narrativeLookaheadInput?.value || '').trim()
+  };
+}
+
+function buildSummaryText() {
+  const projectName = (projectSelect?.value || '').trim() || 'Unassigned Project';
+  const manpowerVal = parseInt(manpowerInput?.value || '0', 10) || 0;
+  const safety = !!(safetyCheckbox && safetyCheckbox.checked);
+  const taskMeta = getSelectedTaskMeta() || {};
+  const qty = Number(qtyCompletedInput?.value || 0);
+  const pct = Number(pctTodayInput?.value || 0);
+  const notes = (notesInput?.value || '').trim();
+  const narrative = getNarrativeState();
+  const fieldTechName = (fieldTechSelect?.value || '').trim();
+  const crewSnapshot = getCrewCostSnapshot();
+  const requests = extractActionableRequests(narrative.lookahead || '');
+  const lines = [
+    `Project: ${projectName}`,
+    `Crew: ${manpowerVal} • Safety: ${safety ? 'Issue noted' : 'Clear'}`,
+    fieldTechName ? `Field tech: ${fieldTechName}` : '',
+    taskMeta && (taskMeta.code || taskMeta.name)
+      ? `Task: ${taskMeta.code ? taskMeta.code + ' — ' : ''}${taskMeta.name || ''}`
+      : '',
+    qty ? `Qty completed today: ${qty}${taskMeta && taskMeta.budgetedQty ? ` / ${taskMeta.budgetedQty}` : ''}` : '',
+    pct ? `Reported progress today: ${pct.toFixed(1)}%` : '',
+    crewSnapshot.manpower && crewSnapshot.hours
+      ? `Crew hours: ${crewSnapshot.manpower} crew × ${crewSnapshot.hours} hrs`
+      : '',
+    crewSnapshot.dailyCost > 0 ? `Est. labor burn: $${formatCurrency(crewSnapshot.dailyCost)}` : '',
+    narrative.workCompleted ? `Work completed: ${narrative.workCompleted}` : '',
+    narrative.materialsInstalled ? `Materials/gear: ${narrative.materialsInstalled}` : '',
+    narrative.issuesRisks ? `Issues/Risks: ${narrative.issuesRisks}` : '',
+    narrative.lookahead ? `Look-ahead / requests: ${narrative.lookahead}` : '',
+    notes ? `Additional notes: ${notes}` : ''
+  ];
+  if (requests.length) {
+    lines.push('Requests flagged:');
+    requests.forEach((req) => lines.push(` • ${req}`));
+  }
+  return lines.filter(Boolean).join('\n').trim();
+}
+
+function updateSummaryPreview() {
+  if (!summaryPreviewEl) return;
+  const summary = buildSummaryText();
+  summaryPreviewEl.textContent = summary || 'Provide updates in the guided prompts above to generate a summary.';
+  updateRequestIntelligence();
+  refreshOverlayStateFromNarratives();
+}
+
+function insertPromptText(targetKey, text) {
+  const target = narrativeInputMap[targetKey];
+  if (!target) return;
+  target.value = target.value ? `${target.value.trim()}\n${text}` : text;
+  updateSummaryPreview();
+}
+
+promptChipRow?.addEventListener('click', (event) => {
+  const chip = event.target.closest('.guided-chip');
+  if (!chip) return;
+  const target = chip.dataset.target || '';
+  const text = chip.dataset.text || '';
+  insertPromptText(target, text);
+});
+
+promptPresetSelect?.addEventListener('change', () => {
+  renderPromptChips(promptPresetSelect.value);
+});
+
+managePromptsBtn?.addEventListener('click', openPromptManager);
+addPromptBtn?.addEventListener('click', (event) => {
+  event.preventDefault();
+  addProjectPromptFromDialog();
+});
+promptManagerList?.addEventListener('click', (event) => {
+  const removeBtn = event.target.closest('[data-remove-prompt]');
+  if (!removeBtn) return;
+  event.preventDefault();
+  const promptId = removeBtn.getAttribute('data-remove-prompt');
+  removeProjectPrompt(promptManagerProjectKey, promptId);
+});
+promptManagerSave?.addEventListener('click', (event) => {
+  event.preventDefault();
+  promptManagerDialog?.close();
+});
+promptManagerCancel?.addEventListener('click', (event) => {
+  event.preventDefault();
+  promptManagerDialog?.close();
+});
+
+fieldTechSelect?.addEventListener('change', () => {
+  if (fieldTechSelect.value) {
+    localStorage.setItem(LAST_TECH_KEY, fieldTechSelect.value);
+  }
+  updateSummaryPreview();
+});
+manageTechBtn?.addEventListener('click', openAssignTechManager);
+addTechBtn?.addEventListener('click', (event) => {
+  event.preventDefault();
+  const name = (newTechInput?.value || '').trim();
+  if (!name) return;
+  const roster = loadTechRoster();
+  if (!roster.includes(name)) {
+    roster.push(name);
+    saveTechRoster(roster);
+  }
+  newTechInput.value = '';
+  if (assignProjectKey) {
+    renderAssignTechList(assignProjectKey);
+  }
+  populateFieldTechDropdown();
+});
+assignTechSave?.addEventListener('click', (event) => {
+  event.preventDefault();
+  if (!assignProjectKey) {
+    assignTechDialog?.close();
+    return;
+  }
+  const selections = Array.from(assignTechList?.querySelectorAll('input[data-name]') || [])
+    .filter((input) => input.checked)
+    .map((input) => input.dataset.name);
+  const assignments = loadTechAssignments();
+  assignments[assignProjectKey] = selections;
+  saveTechAssignments(assignments);
+  assignTechDialog?.close();
+  populateFieldTechDropdown();
+});
+assignTechCancel?.addEventListener('click', (event) => {
+  event.preventDefault();
+  assignTechDialog?.close();
+});
+
+requestSendBtn?.addEventListener('click', notifyProcurementOfRequests);
+
+narrationOverlay?.addEventListener('click', (event) => {
+  const pill = event.target.closest('.overlay-pill');
+  if (!pill) return;
+  event.preventDefault();
+  const targetKey = pill.dataset.target || '';
+  const targetInput = narrativeInputMap[targetKey];
+  if (targetInput) {
+    targetInput.focus();
+    targetInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  pill.classList.add('is-complete');
+});
+
+[narrativeWorkInput, narrativeMaterialsInput, narrativeIssuesInput, narrativeLookaheadInput, notesInput].forEach((el) => {
+  el?.addEventListener('input', updateSummaryPreview);
+});
+[projectSelect, manpowerInput, safetyCheckbox, qtyCompletedInput, pctTodayInput].forEach((el) => {
+  el?.addEventListener('input', updateSummaryPreview);
+  el?.addEventListener('change', updateSummaryPreview);
+});
+
+projectSelect?.addEventListener('change', () => {
+  populateFieldTechDropdown();
+  if ((promptPresetSelect?.value || '') === 'project') {
+    renderPromptChips('project');
+  }
+});
+
+[manpowerInput, crewHoursInput].forEach((el) => {
+  el?.addEventListener('input', updateCrewCostLens);
+  el?.addEventListener('change', updateCrewCostLens);
+});
+
+summaryCopyBtn?.addEventListener('click', async () => {
+  const summary = buildSummaryText();
+  if (!summary) return;
+  try {
+    await navigator.clipboard.writeText(summary);
+    const original = summaryCopyBtn.textContent;
+    summaryCopyBtn.textContent = 'Copied';
+    setTimeout(() => {
+      summaryCopyBtn.textContent = original || 'Copy Summary';
+    }, 1200);
+  } catch (err) {
+    console.warn('Failed to copy summary', err);
+  }
+});
+
+updateSummaryPreview();
 
 function setNetworkStatus() {
   const online = navigator.onLine;
@@ -130,6 +787,8 @@ async function removeQueuedReport(id) {
 async function updateQueueUI() {
   const items = await getQueuedReports();
   queueSummary.textContent = `${items.length} queued`;
+  insightMetrics.queued = items.length;
+  refreshInsightMetrics();
   queueList.innerHTML = '';
   for (const item of items) {
     const li = document.createElement('li');
@@ -210,6 +869,7 @@ recordBtn.addEventListener('click', async () => {
         audioList.appendChild(li);
         recordStatus.textContent = 'Idle';
         mediaRecorder = null;
+        recomputeMediaMetrics();
       };
       mediaRecorder.start();
       recordStatus.textContent = 'Recording...';
@@ -235,7 +895,7 @@ function blobToBase64(blob) {
 }
 
 // Previews
-document.getElementById('photos').addEventListener('change', async (e) => {
+photosInput?.addEventListener('change', async (e) => {
   photoPreview.innerHTML = '';
   const files = e.target.files || [];
   for (const f of files) {
@@ -247,6 +907,19 @@ document.getElementById('photos').addEventListener('change', async (e) => {
     img.addEventListener('click', () => openAnnotateModal(url));
     photoPreview.appendChild(img);
   }
+  recomputeMediaMetrics();
+});
+
+videosInput?.addEventListener('change', (e) => {
+  const files = e.target.files || [];
+  videoList.innerHTML = '';
+  Array.from(files).forEach((file) => {
+    const li = document.createElement('li');
+    li.className = 'text-xs text-slate-600';
+    li.textContent = `${file.name} (${Math.round(file.size / (1024 * 1024))} MB)`;
+    videoList.appendChild(li);
+  });
+  recomputeMediaMetrics();
 });
 
 function openAnnotateModal(url) {
@@ -295,11 +968,11 @@ annotateSave?.addEventListener('click', async () => {
     if (!blob) return;
     capturedAnnotatedImageBlobs.push({ blob, filename: `annotated-${Date.now()}.png`, type: 'image/png' });
     statusEl.textContent = 'Annotated image added.';
+    recomputeMediaMetrics();
   }, 'image/png', 0.95);
 });
 annotateCancel?.addEventListener('click', (e) => { e.preventDefault(); annotateDialog.close(); });
 
-const capturedAnnotatedImageBlobs = [];
 async function buildPayloadFromForm() {
   const project = document.getElementById('project').value;
   const notes = document.getElementById('notes').value || '';
@@ -311,16 +984,22 @@ async function buildPayloadFromForm() {
   const taskMeta = getSelectedTaskMeta();
   const qtyCompleted = Number(qtyCompletedInput && qtyCompletedInput.value || 0);
   const pctToday = Number(pctTodayInput && pctTodayInput.value || 0);
+  const narrative = getNarrativeState();
+  const summaryText = buildSummaryText();
+  const fieldTechName = fieldTechSelect?.value || '';
+  const crewSnapshot = getCrewCostSnapshot();
+  const materialRequests = extractActionableRequests(narrative.lookahead || '');
+  const assignedRoster = getAssignmentsForCurrentProject();
 
   const files = [];
   const stagedFileIds = [];
   // Photos
   const photos = document.getElementById('photos').files;
   for (const f of photos) {
-    if (ENABLE_CHUNKED_UPLOADS && f.size > 5 * 1024 * 1024) {
+    if (enableChunkedUploads && f.size > 5 * 1024 * 1024) {
       const ref = await uploadFileChunked(f, reportId);
       if (ref) stagedFileIds.push(ref);
-    } else if (ENABLE_IMAGE_COMPRESSION && f.type && f.type.startsWith('image/')) {
+    } else if (enableImageCompression && f.type && f.type.startsWith('image/')) {
       const compressed = await compressImageFile(f, { maxWidth: 1600, quality: 0.8 });
       files.push({ blob: await blobToBase64(compressed), filename: f.name, type: compressed.type || f.type });
     } else {
@@ -334,7 +1013,7 @@ async function buildPayloadFromForm() {
   // Videos
   const videos = document.getElementById('videos').files;
   for (const f of videos) {
-    if (ENABLE_CHUNKED_UPLOADS && f.size > 5 * 1024 * 1024) {
+    if (enableChunkedUploads && f.size > 5 * 1024 * 1024) {
       const ref = await uploadFileChunked(f, reportId);
       if (ref) stagedFileIds.push(ref);
     } else {
@@ -363,6 +1042,14 @@ async function buildPayloadFromForm() {
     pctToday,
     files,
     stagedFileIds,
+    narrative,
+    summaryText,
+    fieldTech: fieldTechName,
+    crewHours: crewSnapshot.hours,
+    crewRate: crewSnapshot.rate,
+    crewCost: crewSnapshot.dailyCost,
+    materialRequests,
+    assignedRoster,
     // include token for SW background sync path (server supports reading from body)
     ...(idToken ? { idToken } : {}),
     // Include Acumatica linkage if selected from synced list
@@ -479,8 +1166,14 @@ reportForm.addEventListener('submit', async (e) => {
       statusEl.textContent = 'Report submitted successfully.';
       reportForm.reset();
       capturedAudioBlobs = [];
+      capturedVideoBlobs = [];
       audioList.innerHTML = '';
       photoPreview.innerHTML = '';
+      videoList.innerHTML = '';
+      resetNarrationOverlay();
+      populateFieldTechDropdown();
+      updateCrewCostLens();
+      updateSummaryPreview();
       lastSyncEl.textContent = new Date().toLocaleTimeString();
       return;
     } catch (err) {
@@ -597,6 +1290,7 @@ function loadProjects() {
     }
     projectSelect.appendChild(groupJobs);
   }
+  populateFieldTechDropdown();
 }
 
 addProjectBtn.addEventListener('click', () => {
@@ -608,7 +1302,7 @@ addProjectBtn.addEventListener('click', () => {
     localStorage.setItem('kse_projects', JSON.stringify(saved));
   }
   loadProjects();
-  projectSelect.value = name;
+  projectSelect.value = `custom:${name}`;
 });
 
 // -------- Acumatica jobs sync --------
@@ -732,10 +1426,10 @@ retryAllBtn?.addEventListener('click', () => {
 // -------- Settings dialog --------
 function loadFlags() {
   const flags = JSON.parse(localStorage.getItem('kse_flags') || '{}');
-  if (typeof flags.compression === 'boolean') window.ENABLE_IMAGE_COMPRESSION = flags.compression;
-  if (typeof flags.chunks === 'boolean') window.ENABLE_CHUNKED_UPLOADS = flags.chunks;
-  flagCompression.checked = window.ENABLE_IMAGE_COMPRESSION;
-  flagChunks.checked = window.ENABLE_CHUNKED_UPLOADS;
+  if (typeof flags.compression === 'boolean') enableImageCompression = flags.compression;
+  if (typeof flags.chunks === 'boolean') enableChunkedUploads = flags.chunks;
+  flagCompression.checked = enableImageCompression;
+  flagChunks.checked = enableChunkedUploads;
 }
 settingsBtn.addEventListener('click', () => {
   loadFlags();
@@ -752,13 +1446,15 @@ settingsSave.addEventListener('click', (e) => {
     chunks: !!flagChunks.checked
   };
   localStorage.setItem('kse_flags', JSON.stringify(flags));
-  window.ENABLE_IMAGE_COMPRESSION = flags.compression;
-  window.ENABLE_CHUNKED_UPLOADS = flags.chunks;
+  enableImageCompression = flags.compression;
+  enableChunkedUploads = flags.chunks;
   settingsDialog.close();
 });
 
 // Initial populate
 loadProjects();
+populateFieldTechDropdown();
+renderPromptChips(promptPresetSelect?.value || 'general');
 updateQueueUI();
 
 

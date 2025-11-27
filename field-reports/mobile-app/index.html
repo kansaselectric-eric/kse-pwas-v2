@@ -26,6 +26,99 @@
     /* file input button */
     input[type="file"]::file-selector-button { background: rgba(0,69,140,.06); color: var(--kse-secondary); border:0; border-radius:.5rem; padding:.5rem .75rem; }
     input[type="file"]:hover::file-selector-button { background: rgba(0,69,140,.12); }
+    .guided-chip {
+      border:1px solid rgba(15,23,42,.1);
+      background:#f8fafc;
+      border-radius:999px;
+      padding:0.25rem 0.65rem;
+      font-size:0.7rem;
+      font-weight:600;
+      cursor:pointer;
+      transition:all .15s ease;
+    }
+    .guided-chip:hover { background:#e0f2fe; color:#0369a1; }
+    .prompt-details {
+      border:1px solid #e2e8f0;
+      border-radius:0.65rem;
+      background:#fff;
+      overflow:hidden;
+    }
+    .prompt-details summary {
+      list-style:none;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      cursor:pointer;
+      padding:0.6rem 0.85rem;
+      font-weight:600;
+      color:#334155;
+    }
+    .prompt-details summary::-webkit-details-marker { display:none; }
+    .prompt-details[open] summary { background:#f8fafc; }
+    .prompt-details textarea {
+      width:100%;
+      border:0;
+      border-top:1px solid #e2e8f0;
+      padding:0.75rem;
+      resize:vertical;
+      font-size:0.9rem;
+    }
+    .summary-card {
+      border:1px dashed #cbd5f5;
+      border-radius:0.75rem;
+      background:#f8fafc;
+      padding:0.75rem;
+    }
+    .narration-overlay {
+      position:absolute;
+      inset:0;
+      display:flex;
+      flex-direction:column;
+      justify-content:flex-end;
+      gap:0.35rem;
+      padding:0.65rem;
+      pointer-events:none;
+    }
+    .narration-overlay .overlay-pill {
+      pointer-events:auto;
+      border-radius:999px;
+      background:rgba(15,23,42,.7);
+      color:#fff;
+      font-size:0.7rem;
+      padding:0.25rem 0.75rem;
+      text-transform:uppercase;
+      letter-spacing:0.08em;
+      border:1px solid rgba(255,255,255,.2);
+      display:flex;
+      align-items:center;
+      gap:0.35rem;
+      transition:background .15s ease, transform .15s ease;
+    }
+    .narration-overlay .overlay-pill span {
+      font-weight:600;
+    }
+    .narration-overlay .overlay-pill.is-complete {
+      background:rgba(21,128,61,.85);
+      border-color:rgba(74,222,128,.9);
+      box-shadow:0 5px 15px rgba(22,163,74,.4);
+    }
+    .narration-overlay .overlay-pill:active {
+      transform:scale(0.98);
+    }
+    .request-card {
+      border:1px solid rgba(191,90,21,.25);
+      background:#fff7ed;
+      border-radius:0.75rem;
+      padding:0.75rem;
+    }
+    .request-chip {
+      border-radius:0.5rem;
+      border:1px dashed rgba(191,90,21,.4);
+      padding:0.35rem 0.5rem;
+      font-size:0.75rem;
+      color:#9a3412;
+      background:#fff;
+    }
   </style>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
@@ -47,6 +140,29 @@
       </div>
     </header>
 
+    <section class="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Queued Reports</p>
+        <p id="metricQueuedReports" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+        <p class="text-xs text-slate-500">Offline packages waiting to sync.</p>
+      </article>
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Photos &amp; Markups</p>
+        <p id="metricPhotos" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+        <p class="text-xs text-slate-500">Includes annotated canvases.</p>
+      </article>
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Video Clips</p>
+        <p id="metricVideos" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+        <p class="text-xs text-slate-500">Uploaded or captured on device.</p>
+      </article>
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Voice Notes</p>
+        <p id="metricAudio" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+        <p class="text-xs text-slate-500">Stored in the current session.</p>
+      </article>
+    </section>
+
     <form id="reportForm" class="space-y-4 bg-white rounded-xl shadow p-4">
       <div>
         <label class="block text-sm font-medium mb-1" for="project">Select project</label>
@@ -55,27 +171,101 @@
           <button type="button" id="addProjectBtn" class="px-3 py-2 rounded-lg btn-neutral">Add</button>
           <button type="button" id="syncJobsBtn" class="px-3 py-2 rounded-lg btn-primary">Sync Jobs</button>
         </div>
-          <option value="">Choose a project...</option>
         <p class="text-xs text-slate-500 mt-1">Frequent projects are saved locally. Sync loads jobs from Acumatica.</p>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
-          <label class="block text-sm font-medium mb-1" for="photos">Add photo(s)</label>
-          <input id="photos" type="file" accept="image/*" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
-          <div id="photoPreview" class="mt-2 grid grid-cols-4 gap-2"></div>
+      <div>
+        <label class="block text-sm font-medium mb-1" for="fieldTechSelect">Assigned field tech</label>
+        <div class="flex gap-2">
+          <select id="fieldTechSelect" class="flex-1 w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+            <option value="">Tap to select your name...</option>
+          </select>
+          <button type="button" id="manageTechBtn" class="px-3 py-2 rounded-lg btn-neutral">Manage</button>
         </div>
-        <div>
-          <label class="block text-sm font-medium mb-1" for="videos">Add video(s)</label>
-          <input id="videos" type="file" accept="video/*" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
-          <div class="mt-2 space-y-2">
-            <div class="flex items-center gap-2">
-              <button type="button" id="videoRecordBtn" class="px-3 py-2 rounded-lg btn-primary">Start Video</button>
+        <p class="text-xs text-slate-500 mt-1">PMs can assign a roster per project; tech picks their name so PMs know who reported.</p>
+      </div>
+
+      <div class="grid grid-cols-1 gap-4 items-start">
+        <section class="video-card rounded-xl border border-slate-200 shadow-sm p-4 bg-white flex flex-col gap-4">
+          <div class="flex flex-col gap-3">
+            <div class="flex items-center justify-between flex-wrap gap-2">
+              <label class="text-sm font-semibold text-slate-800 uppercase tracking-wide" for="videos">Narrated video & prompts</label>
+              <input id="videos" type="file" accept="video/*" multiple class="text-xs file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:bg-slate-100 file:text-slate-700 hover:file:bg-slate-200">
+            </div>
+            <p class="text-xs text-slate-500 -mt-1">Record one clip and hit the talking points below. No need for multiple videos.</p>
+            <div class="flex flex-wrap items-center gap-2">
+              <button type="button" id="videoRecordBtn" class="px-4 py-2 rounded-lg bg-slate-900 text-white text-sm font-semibold hover:bg-slate-800">Start Narration</button>
               <span id="videoRecordStatus" class="text-sm text-slate-500">Idle</span>
             </div>
-            <video id="cameraPreview" class="w-full h-40 bg-black rounded" autoplay muted playsinline></video>
-            <ul id="videoList" class="text-sm text-slate-600 list-disc pl-5"></ul>
+            <div class="relative rounded-lg overflow-hidden border border-slate-200 bg-slate-900">
+              <video id="cameraPreview" class="w-full h-48 object-cover" autoplay muted playsinline></video>
+              <div class="absolute top-2 left-2 text-xs px-2 py-1 rounded bg-slate-900/70 text-white uppercase tracking-wide">Live preview</div>
+              <div id="narrationOverlay" class="narration-overlay">
+                <button type="button" class="overlay-pill" data-target="work"><span>Work</span> ✓ hit install notes</button>
+                <button type="button" class="overlay-pill" data-target="materials"><span>Materials</span> ✓ what was set</button>
+                <button type="button" class="overlay-pill" data-target="issues"><span>Risks</span> ✓ blockers/safety</button>
+                <button type="button" class="overlay-pill" data-target="lookahead"><span>Needs</span> ✓ crew/material ask</button>
+              </div>
+            </div>
+            <ul id="videoList" class="text-xs text-slate-500 space-y-1"></ul>
           </div>
+          <div class="space-y-3">
+            <div>
+              <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500 font-semibold mb-1">Guided narration</p>
+              <p class="text-xs text-slate-500 mb-2">Mention these points while filming or jot quick notes.</p>
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+                <label for="promptPresetSelect" class="text-[11px] font-semibold uppercase tracking-[0.3em] text-slate-500">Prompt preset</label>
+                <select id="promptPresetSelect" class="rounded-lg border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500">
+                  <option value="general">General build</option>
+                  <option value="substation">Substation</option>
+                  <option value="solar">Solar farm</option>
+                  <option value="data">Data center</option>
+                  <option value="service">Service call</option>
+                  <option value="underground">Underground</option>
+                  <option value="project">Project-specific</option>
+                </select>
+                <button type="button" id="managePromptsBtn" class="px-3 py-1.5 rounded-lg btn-neutral text-xs">Library</button>
+              </div>
+              <div id="promptChipRow" class="flex flex-wrap gap-2 text-xs"></div>
+            </div>
+            <div class="space-y-2">
+              <details class="prompt-details" open>
+                <summary>1. Work Completed<span class="text-xs font-normal text-slate-400">tap to hide/show note</span></summary>
+                <textarea id="narrativeWork" rows="2" placeholder="What was installed, tested, or energized?"></textarea>
+              </details>
+              <details class="prompt-details">
+                <summary>2. Materials / Equipment<span class="text-xs font-normal text-slate-400">panels, gear, prefab, etc.</span></summary>
+                <textarea id="narrativeMaterials" rows="2" placeholder="Panels, gear, cable reels, prefab, etc."></textarea>
+              </details>
+              <details class="prompt-details">
+                <summary>3. Issues / Risks<span class="text-xs font-normal text-slate-400">conflicts, outages, safety items</span></summary>
+                <textarea id="narrativeIssues" rows="2" placeholder="Conflicts, outages, safety items, GC/owner holds."></textarea>
+              </details>
+              <details class="prompt-details">
+                <summary>4. Look-ahead / Needs<span class="text-xs font-normal text-slate-400">next steps, requests</span></summary>
+                <textarea id="narrativeLookahead" rows="2" placeholder="Next steps, crew/equipment/material requests."></textarea>
+              </details>
+            </div>
+            <div class="summary-card">
+              <div class="flex items-center justify-between mb-1">
+                <p class="text-[10px] uppercase tracking-[0.3em] text-slate-500 font-semibold">PM Summary Preview</p>
+                <button type="button" id="summaryCopy" class="text-[11px] px-2 py-1 rounded bg-white border border-slate-200 hover:bg-slate-100">Copy</button>
+              </div>
+              <pre id="summaryPreview" class="text-xs text-slate-800 whitespace-pre-wrap min-h-[80px]"></pre>
+            </div>
+            <div id="requestIntelligence" class="request-card hidden">
+              <div class="flex items-center justify-between mb-2 gap-2">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-amber-700 font-semibold">Requests flagged</p>
+                <button type="button" id="requestSendBtn" class="text-xs px-3 py-1.5 rounded bg-amber-600 text-white font-semibold hover:bg-amber-500">Notify procurement</button>
+              </div>
+              <ul id="requestList" class="list-disc pl-5 text-xs text-amber-900 space-y-1"></ul>
+            </div>
+          </div>
+        </section>
+        <div class="rounded-xl border border-slate-200 shadow-sm p-4 bg-white">
+          <label class="block text-sm font-semibold text-slate-700 mb-1" for="photos">Add photo(s)</label>
+          <input id="photos" type="file" accept="image/*" multiple class="w-full text-sm file:mr-4 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100">
+          <div id="photoPreview" class="mt-2 grid grid-cols-4 gap-2"></div>
         </div>
       </div>
 
@@ -119,6 +309,17 @@
           <input id="safetyIssues" type="checkbox" class="rounded border-slate-300 text-sky-600 focus:ring-sky-500">
           <label for="safetyIssues" class="text-sm">Safety issues observed</label>
         </div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium mb-1" for="crewHours">Crew hours today</label>
+        <input id="crewHours" type="number" min="0" step="0.25" placeholder="8" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+        <p class="text-xs text-slate-500 mt-1">We’ll handle burdened rate behind the scenes—just log how long the crew was on site.</p>
+      </div>
+      <div class="summary-card" id="crewCostCard">
+        <p class="text-[11px] uppercase tracking-[0.25em] text-slate-500 font-semibold mb-1">Crew hours + cost lens</p>
+        <p id="crewCostLens" class="text-sm font-semibold text-slate-800">Set crew, hours, and rate to surface daily burn.</p>
+        <p id="crewCostDetail" class="text-xs text-slate-500"></p>
       </div>
 
       <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -176,6 +377,51 @@
         <div class="mt-4 flex justify-end gap-2">
           <button id="settingsCancel" class="px-3 py-1.5 rounded btn-neutral text-sm">Cancel</button>
           <button id="settingsSave" class="px-3 py-1.5 rounded btn-primary text-sm">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="assignTechDialog" class="rounded-xl p-0 border border-slate-200">
+      <form method="dialog" class="p-4 w-[24rem] space-y-3">
+        <div>
+          <h3 class="text-lg font-semibold">Assign field techs</h3>
+          <p id="assignTechProjectLabel" class="text-xs text-slate-500">Select a project above to manage roster.</p>
+        </div>
+        <div id="assignTechList" class="space-y-2 max-h-56 overflow-y-auto pr-1"></div>
+        <div class="flex gap-2">
+          <input id="newTechInput" type="text" placeholder="Add name..." class="flex-1 rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm">
+          <button type="button" id="addTechBtn" class="px-3 py-1.5 rounded btn-primary text-sm">Add</button>
+        </div>
+        <div class="flex justify-end gap-2 pt-2">
+          <button id="assignTechCancel" class="px-3 py-1.5 rounded btn-neutral text-sm">Cancel</button>
+          <button id="assignTechSave" class="px-3 py-1.5 rounded btn-primary text-sm">Save</button>
+        </div>
+      </form>
+    </dialog>
+
+    <dialog id="promptManagerDialog" class="rounded-xl p-0 border border-slate-200">
+      <form method="dialog" class="p-4 w-[26rem] space-y-3">
+        <div>
+          <h3 class="text-lg font-semibold">Prompt Library</h3>
+          <p id="promptManagerLabel" class="text-xs text-slate-500">Curate job-specific talking points for this project.</p>
+        </div>
+        <div id="promptManagerList" class="space-y-2 max-h-60 overflow-y-auto pr-1"></div>
+        <div class="space-y-2">
+          <input id="newPromptLabel" type="text" placeholder="Label (e.g., Switchgear lineup)" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm">
+          <select id="newPromptTarget" class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm">
+            <option value="work">Work completed</option>
+            <option value="materials">Materials / gear</option>
+            <option value="issues">Issues / risks</option>
+            <option value="lookahead">Look-ahead / needs</option>
+          </select>
+          <textarea id="newPromptText" rows="2" placeholder="Quick blurb the crew should cover..." class="w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm"></textarea>
+        </div>
+        <div class="flex justify-between items-center">
+          <button type="button" id="addPromptBtn" class="px-3 py-1.5 rounded btn-neutral text-sm">Add to project</button>
+          <div class="flex gap-2">
+            <button id="promptManagerCancel" class="px-3 py-1.5 rounded btn-neutral text-sm">Close</button>
+            <button id="promptManagerSave" class="px-3 py-1.5 rounded btn-primary text-sm">Save</button>
+          </div>
         </div>
       </form>
     </dialog>

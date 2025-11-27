@@ -10,6 +10,7 @@
 var ROOT_DRIVE_FOLDER_NAME = 'KSE Field Reports';
 var SUMMARY_SHEET_NAME = 'KSE_Field_Reports';
 var USERS_SHEET_NAME = 'KSE_Users'; // email, role
+var PROJECT_PM_SHEET_NAME = 'Project_PMs';
 var ALLOWED_DOMAINS = ['kansaselectric.com']; // TODO: adjust for your org
 var GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; // must match PWA
 var ENABLE_CHUNKED_UPLOADS = false; // flip to true when moving to chunk assembly
@@ -167,10 +168,18 @@ function doPost(e) {
     var task = body.task || null;
     var qtyCompleted = body.qtyCompleted || 0;
     var pctToday = body.pctToday || 0;
+    var narrative = body.narrative || {};
+    var summaryText = body.summaryText || '';
+    var fieldTech = body.fieldTech || '';
+    var crewHours = Number(body.crewHours || 0);
+    var crewRate = Number(body.crewRate || 0);
+    var crewCost = Number(body.crewCost || 0);
+    var lookaheadRequests = Array.isArray(body.materialRequests) ? body.materialRequests : [];
 
     var rootFolder = getOrCreateRootFolder_();
     var projectFolder = getOrCreateSubFolder_(rootFolder, project);
     var dayFolder = getOrCreateSubFolder_(projectFolder, dateFolder);
+    var dayFolderUrl = dayFolder.getUrl();
 
     var savedFilenames = [];
     for (var i = 0; i < files.length; i++) {
@@ -235,7 +244,14 @@ function doPost(e) {
       acumaticaJobId: acJobId,
       acumaticaJobNumber: acJobNumber,
       acumaticaJobName: acJobName,
-      location: location
+      location: location,
+      narrative: narrative,
+      summaryText: summaryText,
+      fieldTech: fieldTech,
+      crewHours: crewHours,
+      crewRate: crewRate,
+      crewCost: crewCost,
+      lookaheadRequests: lookaheadRequests
     });
 
     // Placeholder: enqueue AI summary (to be implemented)
@@ -265,6 +281,28 @@ function doPost(e) {
         email: email
       });
     }
+
+    sendProjectManagerEmail_({
+      project: project,
+      timestamp: timestampIso,
+      manpower: manpower,
+      safetyFlags: safetyFlags,
+      narrative: narrative,
+      summaryText: summaryText,
+      notes: notes,
+      task: task,
+      qtyCompleted: qtyCompleted,
+      pctToday: pctToday,
+      folderUrl: dayFolderUrl,
+      submittedBy: email,
+      acumaticaJobNumber: acJobNumber,
+      acumaticaJobName: acJobName,
+      fieldTech: fieldTech,
+      crewHours: crewHours,
+      crewRate: crewRate,
+      crewCost: crewCost,
+      lookaheadRequests: lookaheadRequests
+    });
 
     return createCorsResponse_({ ok: true });
   } catch (err) {
@@ -360,11 +398,32 @@ function moveStagedFilesTo_(stagedIds, destFolder) {
   return names;
 }
 
+function ensureSummaryHeader_(sheet) {
+  var expected = ['Timestamp', 'Project', 'Manpower', 'Safety Issues', 'Notes', 'Files', 'ReportId', 'SubmittedBy', 'AcumaticaJobId', 'AcumaticaJobNumber', 'AcumaticaJobName', 'Lat', 'Lng', 'Accuracy', 'NarrativeWork', 'NarrativeMaterials', 'NarrativeIssues', 'NarrativeLookahead', 'SummaryText', 'FieldTech', 'CrewHours', 'CrewRate', 'CrewCost', 'LookaheadRequests'];
+  if (sheet.getMaxColumns() < expected.length) {
+    sheet.insertColumnsAfter(sheet.getMaxColumns(), expected.length - sheet.getMaxColumns());
+  }
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(expected);
+    return expected;
+  }
+  var current = sheet.getRange(1, 1, 1, expected.length).getValues()[0];
+  var needsUpdate = false;
+  for (var i = 0; i < expected.length; i++) {
+    if (current[i] !== expected[i]) {
+      needsUpdate = true;
+      break;
+    }
+  }
+  if (needsUpdate) {
+    sheet.getRange(1, 1, 1, expected.length).setValues([expected]);
+  }
+  return expected;
+}
+
 function appendSummaryRow_(entry) {
   var sheet = getOrCreateSheet_(SUMMARY_SHEET_NAME);
-  if (sheet.getLastRow() === 0) {
-    sheet.appendRow(['Timestamp', 'Project', 'Manpower', 'Safety Issues', 'Notes', 'Files', 'ReportId', 'SubmittedBy', 'AcumaticaJobId', 'AcumaticaJobNumber', 'AcumaticaJobName', 'Lat', 'Lng', 'Accuracy']);
-  }
+  ensureSummaryHeader_(sheet);
   sheet.appendRow([
     entry.timestamp,
     entry.project,
@@ -379,8 +438,181 @@ function appendSummaryRow_(entry) {
     entry.acumaticaJobName || '',
     entry.location && entry.location.lat ? entry.location.lat : '',
     entry.location && entry.location.lng ? entry.location.lng : '',
-    entry.location && entry.location.accuracy ? entry.location.accuracy : ''
+    entry.location && entry.location.accuracy ? entry.location.accuracy : '',
+    entry.narrative && entry.narrative.workCompleted ? entry.narrative.workCompleted : '',
+    entry.narrative && entry.narrative.materialsInstalled ? entry.narrative.materialsInstalled : '',
+    entry.narrative && entry.narrative.issuesRisks ? entry.narrative.issuesRisks : '',
+    entry.narrative && entry.narrative.lookahead ? entry.narrative.lookahead : '',
+    entry.summaryText || '',
+    entry.fieldTech || '',
+    entry.crewHours || '',
+    entry.crewRate || '',
+    entry.crewCost || '',
+    entry.lookaheadRequests && entry.lookaheadRequests.length ? entry.lookaheadRequests.join(' | ') : ''
   ]);
+}
+
+function getProjectManagerEmail_(project) {
+  if (!project) return '';
+  var sheet = getOrCreateSheet_(PROJECT_PM_SHEET_NAME);
+  if (sheet.getLastRow() === 0) {
+    sheet.appendRow(['Project', 'ManagerEmail']);
+    return '';
+  }
+  var data = sheet.getDataRange().getValues();
+  for (var i = 1; i < data.length; i++) {
+    if (String(data[i][0]).trim() === String(project).trim()) {
+      return String(data[i][1] || '').trim();
+    }
+  }
+  return '';
+}
+
+function buildSummaryTextFromEntry_(entry) {
+  var parts = [];
+  if (entry.narrative) {
+    if (entry.narrative.workCompleted) parts.push('Work completed: ' + entry.narrative.workCompleted);
+    if (entry.narrative.materialsInstalled) parts.push('Materials/gear: ' + entry.narrative.materialsInstalled);
+    if (entry.narrative.issuesRisks) parts.push('Issues/Risks: ' + entry.narrative.issuesRisks);
+    if (entry.narrative.lookahead) parts.push('Look-ahead / requests: ' + entry.narrative.lookahead);
+  }
+  if (entry.notes && entry.notes.trim()) {
+    parts.push('Notes: ' + entry.notes);
+  }
+  if (!parts.length) {
+    parts.push('No additional narrative captured.');
+  }
+  return parts.join('\n');
+}
+
+function sendProjectManagerEmail_(entry) {
+  var pmEmail = getProjectManagerEmail_(entry.project);
+  if (!pmEmail) return;
+  var tz = Session.getScriptTimeZone();
+  var stamp = Utilities.formatDate(new Date(entry.timestamp), tz, 'MMM d, yyyy HH:mm');
+  var summary = entry.summaryText && entry.summaryText.trim() ? entry.summaryText : buildSummaryTextFromEntry_(entry);
+  var spi = computeProjectSpiSnapshot_(entry.project);
+  var lines = [];
+  lines.push('Project: ' + entry.project);
+  lines.push('Submitted: ' + stamp + ' by ' + (entry.submittedBy || 'Unknown'));
+  lines.push('Manpower: ' + entry.manpower + ' • Safety: ' + (entry.safetyFlags ? 'Issue noted' : 'Clear'));
+  if (entry.fieldTech) {
+    lines.push('Field tech on report: ' + entry.fieldTech);
+  }
+  if (entry.crewHours || entry.crewCost) {
+    var totalHours = (Number(entry.manpower || 0) || 0) * (Number(entry.crewHours || 0) || 0);
+    var crewCostLine = 'Crew: ' + (entry.manpower || 0) + ' ppl × ' + (entry.crewHours || 0) + ' hrs';
+    if (totalHours) crewCostLine += ' (' + totalHours + ' total hrs)';
+    if (entry.crewRate) crewCostLine += ' @ $' + entry.crewRate + '/hr';
+    if (entry.crewCost) crewCostLine += ' • est labor $' + Math.round(entry.crewCost);
+    lines.push(crewCostLine);
+  }
+  if (entry.acumaticaJobNumber) {
+    lines.push('Job: ' + entry.acumaticaJobNumber + (entry.acumaticaJobName ? ' — ' + entry.acumaticaJobName : ''));
+  }
+  if (entry.task && (entry.task.code || entry.task.name)) {
+    lines.push('Task: ' + (entry.task.code ? entry.task.code + ' — ' : '') + (entry.task.name || ''));
+  }
+  if (entry.qtyCompleted || entry.pctToday) {
+    lines.push('Progress: ' + (entry.qtyCompleted || 0) + ' units • ' + (entry.pctToday || 0) + '% reported today');
+  }
+  if (spi) {
+    lines.push(
+      'SPI Snapshot: ' +
+        (spi.spi != null ? spi.spi.toFixed(2) : 'n/a') +
+        ' (Planned ' +
+        Math.round(spi.plannedPct * 100) +
+        '% • Actual ' +
+        Math.round(spi.actualPct * 100) +
+        '%)'
+    );
+  }
+  lines.push('');
+  lines.push(summary);
+  lines.push('');
+  if (entry.lookaheadRequests && entry.lookaheadRequests.length) {
+    lines.push('Requests flagged:');
+    entry.lookaheadRequests.forEach(function(req) {
+      lines.push(' - ' + req);
+    });
+    lines.push('');
+  }
+  if (entry.folderUrl) {
+    lines.push('Report folder: ' + entry.folderUrl);
+  }
+  MailApp.sendEmail(pmEmail, '[Field Report] ' + entry.project + ' — ' + stamp, lines.join('\n'));
+}
+
+function computeProjectSpiSnapshot_(project) {
+  if (!project) return null;
+  var schedule = getOrCreateSheet_('Project_Schedule').getDataRange().getValues();
+  if (schedule.length <= 1) return null;
+  var header = schedule[0];
+  var idxProj = header.indexOf('Project');
+  var idxId = header.indexOf('TaskId');
+  var idxStart = header.indexOf('Start');
+  var idxEnd = header.indexOf('End');
+  if (idxProj === -1 || idxId === -1) return null;
+  var tasks = [];
+  for (var i = 1; i < schedule.length; i++) {
+    var row = schedule[i];
+    if (String(row[idxProj]) !== String(project)) continue;
+    var start = row[idxStart] ? new Date(row[idxStart]) : null;
+    var end = row[idxEnd] ? new Date(row[idxEnd]) : null;
+    tasks.push({ id: String(row[idxId] || ''), start: start, end: end });
+  }
+  if (!tasks.length) return null;
+  var today = new Date();
+  var plannedSum = 0;
+  tasks.forEach(function(task) {
+    if (!task.start || !task.end) {
+      plannedSum += 0;
+      return;
+    }
+    var total = Math.max(1, Math.round((task.end - task.start) / (24 * 60 * 60 * 1000)) + 1);
+    var elapsed = Math.max(0, Math.min(total, Math.round((today - task.start) / (24 * 60 * 60 * 1000)) + 1));
+    var planned = 0;
+    if (today < task.start) planned = 0;
+    else if (today > task.end) planned = 1;
+    else planned = elapsed / total;
+    plannedSum += planned;
+  });
+  var plannedAvg = plannedSum / tasks.length;
+  var progress = getOrCreateSheet_('Schedule_Progress').getDataRange().getValues();
+  var actualPctByTask = {};
+  if (progress.length > 1) {
+    var h = progress[0];
+    var idxTask = h.indexOf('TaskId');
+    var idxPct = h.indexOf('PctToday');
+    var idxQty = h.indexOf('QtyCompleted');
+    var idxBudget = h.indexOf('BudgetedQty');
+    var idxTs = h.indexOf('Timestamp');
+    for (var r = 1; r < progress.length; r++) {
+      var prow = progress[r];
+      if (String(prow[idxTask]) === '') continue;
+      var when = idxTs >= 0 ? new Date(prow[idxTs]) : null;
+      if (when && when > today) continue;
+      var tid = String(prow[idxTask]);
+      var pctRow = idxPct >= 0 ? Number(prow[idxPct] || 0) / 100 : 0;
+      var qtyRow = idxQty >= 0 ? Number(prow[idxQty] || 0) : 0;
+      var budgetRow = idxBudget >= 0 ? Number(prow[idxBudget] || 0) : 0;
+      var inc = pctRow || (budgetRow ? qtyRow / budgetRow : 0);
+      actualPctByTask[tid] = Math.min(1, (actualPctByTask[tid] || 0) + inc);
+    }
+  }
+  var actualSum = 0;
+  tasks.forEach(function(task) {
+    actualSum += actualPctByTask[task.id] || 0;
+  });
+  var actualAvg = Math.min(1, actualSum / tasks.length);
+  var variance = actualAvg - plannedAvg;
+  var spi = plannedAvg > 0 ? actualAvg / plannedAvg : (actualAvg >= 0 ? 1 : 0);
+  return {
+    plannedPct: plannedAvg,
+    actualPct: actualAvg,
+    variancePct: variance,
+    spi: spi
+  };
 }
 
 function getOrCreateSheet_(name) {

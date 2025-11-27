@@ -3,37 +3,64 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0F5FB3">
   <title>KSE Smart Contacts</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 <body class="bg-slate-50 text-slate-900">
-  <div class="max-w-4xl mx-auto p-4">
-    <header class="mb-4">
-      <h1 class="text-2xl font-semibold">Smart Contacts</h1>
-      <p class="text-sm text-slate-500">Load a contacts JSON file and filter in real-time.</p>
+  <div class="max-w-5xl mx-auto p-4 space-y-4">
+    <header class="rounded-3xl p-6 text-white" style="background:linear-gradient(135deg,#00458C 0%,#0F5FB3 55%,#F7941E 100%); box-shadow:0 20px 45px rgba(15,23,42,0.12);">
+      <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <p class="text-xs uppercase tracking-[0.35em] text-white/70">Kansas Electric · Relationship Graph</p>
+          <h1 class="text-3xl font-semibold mt-2">Smart Contacts</h1>
+          <p class="text-sm text-white/80 max-w-2xl">Load any contact dataset, slice it instantly, pin your go-to buyers, and spin up outreach segments that can be handed to Opportunity Scout.</p>
+        </div>
+        <div class="text-right text-xs text-white/80">
+          <p>Last load: <span id="lastLoad">never</span></p>
+          <p>Cache: <span id="cacheStatus">empty</span></p>
+        </div>
+      </div>
     </header>
 
-    <section class="bg-white rounded-xl shadow p-4 space-y-4">
-      <div class="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
+    <section class="grid sm:grid-cols-4 gap-3">
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Total Contacts</p>
+        <p id="metricTotal" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+      </article>
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Filtered View</p>
+        <p id="metricFiltered" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+      </article>
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Unique Companies</p>
+        <p id="metricCompanies" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+      </article>
+      <article class="bg-white rounded-xl shadow p-4">
+        <p class="text-xs uppercase text-slate-500 font-semibold">Pinned Targets</p>
+        <p id="metricPinned" class="text-3xl font-semibold text-slate-900 mt-1">0</p>
+      </article>
+    </section>
+
+    <section class="bg-white rounded-2xl shadow p-4 space-y-4">
+      <div class="flex flex-col lg:flex-row gap-3 items-start lg:items-center">
         <input id="contactsFile" type="file" accept="application/json" class="text-sm">
-        <input id="search" type="text" placeholder="Search name, company, tag, email, phone..." class="flex-1 w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
+        <input id="search" type="text" placeholder="Search name, company, title, email, phone..." class="flex-1 w-full rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500">
         <select id="sortSelect" class="rounded border-slate-300 text-sm">
           <option value="name">Sort: Name</option>
           <option value="company">Sort: Company</option>
           <option value="title">Sort: Title</option>
         </select>
       </div>
-
       <div class="flex flex-wrap gap-2">
-        <input id="tagFilter" type="text" placeholder="Filter tag..." class="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm">
+        <input id="tagFilter" type="text" placeholder="Filter tag or vertical..." class="rounded-lg border-slate-300 focus:border-sky-500 focus:ring-sky-500 text-sm">
         <button id="exportCsv" class="px-3 py-1.5 rounded bg-emerald-600 text-white text-sm hover:bg-emerald-700">Export CSV</button>
         <button id="exportJson" class="px-3 py-1.5 rounded bg-slate-800 text-white text-sm hover:bg-slate-900">Export JSON</button>
-        <button id="clearData" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Clear</button>
+        <button id="clearData" class="px-3 py-1.5 rounded bg-slate-100 text-slate-700 text-sm hover:bg-slate-200">Clear Cache</button>
       </div>
-
-      <div class="text-xs text-slate-500">
-        Expected JSON format: array of contacts
-        <pre class="bg-slate-50 p-2 rounded border border-slate-200 overflow-auto">
+      <details class="text-xs text-slate-500">
+        <summary class="cursor-pointer font-semibold">Expected JSON schema</summary>
+        <pre class="bg-slate-50 p-2 mt-2 rounded border border-slate-200 overflow-auto">
 [
   {
     "name": "Jane Doe",
@@ -45,9 +72,44 @@
   }
 ]
         </pre>
-      </div>
+      </details>
+    </section>
 
-      <ul id="results" class="divide-y divide-slate-200 bg-white rounded-lg"></ul>
+    <section class="grid md:grid-cols-2 gap-4">
+      <article class="bg-white rounded-2xl shadow p-4">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div>
+            <h2 class="text-lg font-semibold">Saved Segments</h2>
+            <p class="text-xs text-slate-500">Store filters for one-click recall.</p>
+          </div>
+          <button id="saveSegmentBtn" class="text-xs px-3 py-1.5 rounded bg-slate-900 text-white">Save Current</button>
+        </div>
+        <input id="segmentName" type="text" placeholder="Segment name (e.g. Utility + KS)" class="w-full rounded-lg border-slate-300 text-sm focus:border-sky-500 focus:ring-sky-500 mb-3">
+        <ul id="segmentList" class="space-y-2 text-sm"></ul>
+        <p id="segmentEmpty" class="text-sm text-slate-500">No segments saved yet.</p>
+      </article>
+      <article class="bg-white rounded-2xl shadow p-4">
+        <div class="flex items-center justify-between gap-2 mb-2">
+          <div>
+            <h2 class="text-lg font-semibold">Pinned Targets</h2>
+            <p class="text-xs text-slate-500">Contacts you flagged for personal outreach.</p>
+          </div>
+          <button id="clearPinned" class="text-xs px-3 py-1.5 rounded border border-slate-200 text-slate-600 hover:bg-slate-100">Clear Pins</button>
+        </div>
+        <ul id="pinnedList" class="space-y-2 text-sm"></ul>
+        <p id="pinnedEmpty" class="text-sm text-slate-500">Pin contacts from the list to see them here.</p>
+      </article>
+    </section>
+
+    <section class="grid md:grid-cols-3 gap-4">
+      <article class="bg-white rounded-2xl shadow p-4 md:col-span-2">
+        <h2 class="text-lg font-semibold mb-2">Contact Results</h2>
+        <ul id="results" class="divide-y divide-slate-200 bg-white rounded-lg"></ul>
+      </article>
+      <article class="bg-white rounded-2xl shadow p-4">
+        <h2 class="text-lg font-semibold mb-2">Contact Preview</h2>
+        <div id="contactPreview" class="text-sm text-slate-600">Select a contact to see richer details and quick actions.</div>
+      </article>
     </section>
   </div>
   <script src="app.js"></script>

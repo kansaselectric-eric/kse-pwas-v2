@@ -1,0 +1,44 @@
+[
+  {
+    "id": "seed-lab-battery",
+    "title": "Midwest utility-scale battery yard (150MW)",
+    "summary": "Regional co-op released preliminary scope for a 150MW battery yard with four medium voltage interconnects, relays, and prefabricated inverter skids.",
+    "source": "KSE Intelligence",
+    "url": "https://kselectric.com/internal/battery-brief",
+    "type": "bid",
+    "agency": "Regional Co-op",
+    "location": "KS / MO state line",
+    "postedDate": "2025-10-28T00:00:00.000Z",
+    "dueDate": "2025-12-12T00:00:00.000Z",
+    "value": 64000000,
+    "tags": ["battery", "utility", "skid"]
+  },
+  {
+    "id": "seed-datahall",
+    "title": "Hyperscale data hall fit-out (Tier IV)",
+    "summary": "Owner issued electrical RFP for dual-fed 40MW build-out with Starline bus, containment lighting, and redundant battery strings.",
+    "source": "KSE Intelligence",
+    "url": "https://kselectric.com/internal/datahall-brief",
+    "type": "bid",
+    "agency": "Confidential Hyperscaler",
+    "location": "Omaha, NE",
+    "postedDate": "2025-11-10T00:00:00.000Z",
+    "dueDate": "2025-12-05T00:00:00.000Z",
+    "value": 98000000,
+    "tags": ["data center", "tier4", "starline"]
+  },
+  {
+    "id": "seed-solar-expansion",
+    "title": "Kansas solar campus expansion planned",
+    "summary": "Developer hinted at a 120MW addition with DC collection upgrades, battery containers, and new grid interconnection study.",
+    "source": "Market Whisper",
+    "url": "https://kselectric.com/internal/solar-whisper",
+    "type": "expansion",
+    "location": "Central KS",
+    "postedDate": "2025-11-20T00:00:00.000Z",
+    "value": null,
+    "tags": ["solar", "battery", "expansion"]
+  }
+]
+
+

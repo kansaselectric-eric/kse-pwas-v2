@@ -44,6 +44,8 @@ const UNIT_NORMALIZATION = {
   zone: ['zone', 'zones']
 };
 
+const PAGE_MARKER_REGEX = /^\[\[PAGE:(.+?):(\d+)\]\]$/;
+
 function tokenize(text) {
   const normalized = (text || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ');
   const words = normalized.split(/\s+/).filter(Boolean);
@@ -53,7 +55,16 @@ function tokenize(text) {
 function buildTakeoff(raw, dict = {}) {
   const lines = (raw || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   const items = [];
+  let currentSource = { file: 'Unknown file', page: 1 };
   for (const line of lines) {
+    const markerMatch = line.match(PAGE_MARKER_REGEX);
+    if (markerMatch) {
+      currentSource = {
+        file: decodeURIComponent(markerMatch[1]),
+        page: Number(markerMatch[2]) || 1
+      };
+      continue;
+    }
     const qtyMatch = line.match(/(?:^|\s)(?:qty|quantity|q\/ty|q:|#)?\s*(\d{1,6}(?:\.\d{1,2})?)/i);
     if (!qtyMatch) continue;
     const quantity = Number(qtyMatch[1]);
@@ -74,7 +85,10 @@ function buildTakeoff(raw, dict = {}) {
       category,
       keywords,
       complexity,
-      priorityScore
+      priorityScore,
+      sourceFile: currentSource.file,
+      sourcePage: currentSource.page,
+      sourceText: line
     });
   }
   return consolidateItems(items);
@@ -137,16 +151,57 @@ function consolidateItems(items) {
   for (const item of items) {
     const key = item.description.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
     if (!map.has(key)) {
-      map.set(key, { ...item });
+      map.set(key, { ...item, sources: [{ file: item.sourceFile, page: item.sourcePage }] });
     } else {
       const existing = map.get(key);
       existing.quantity += item.quantity;
       existing.keywords = Array.from(new Set([...(existing.keywords || []), ...(item.keywords || [])]));
       existing.priorityScore = Math.max(existing.priorityScore, item.priorityScore);
+      if (!existing.sources) existing.sources = [];
+      existing.sources.push({ file: item.sourceFile, page: item.sourcePage });
+      if (!existing.sourceFile) existing.sourceFile = item.sourceFile;
+      if (!existing.sourcePage) existing.sourcePage = item.sourcePage;
       map.set(key, existing);
     }
   }
-  return Array.from(map.values()).slice(0, 60);
+  return Array.from(map.values())
+    .slice(0, 60)
+    .map((item) => {
+      const quality = assessItemQuality(item);
+      return { ...item, qualityScore: quality.score, qualityGrade: quality.grade, issues: quality.issues };
+    });
+}
+function assessItemQuality(item) {
+  let score = 0.65;
+  const issues = [];
+  if (!item.keywords || item.keywords.length === 0) {
+    score -= 0.25;
+    issues.push('No dictionary matches');
+  } else if (item.keywords.length === 1) {
+    score -= 0.05;
+  } else {
+    score += 0.05;
+  }
+  if (item.description.length < 10) {
+    score -= 0.1;
+    issues.push('Description is very short');
+  }
+  if (!item.unit || item.unit === 'ea') {
+    score -= 0.05;
+  }
+  if (item.complexity === 'high') score += 0.05;
+  if (item.complexity === 'low') score -= 0.05;
+  if (item.quantity <= 1 && item.unit !== 'ea') {
+    score -= 0.1;
+    issues.push('Quantity is very low for this unit');
+  }
+  if (item.priorityScore >= 80) score += 0.05;
+  const clamped = Math.min(1, Math.max(0, score));
+  const grade = clamped >= 0.75 ? 'High' : clamped >= 0.55 ? 'Medium' : 'Review';
+  if (grade === 'Review' && issues.length === 0) {
+    issues.push('Needs human verification');
+  }
+  return { score: clamped, grade, issues };
 }
 
 function computeMetrics(scope, takeoff, risks) {

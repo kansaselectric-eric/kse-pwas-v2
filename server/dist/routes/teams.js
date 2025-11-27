@@ -29,6 +29,7 @@ teamsRouter.post('/notify', async (req, res) => {
         res.json({ ok: true });
     }
     catch (e) {
-        res.status(500).json({ ok: false, error: String(e?.message || e) });
+        const message = e instanceof Error ? e.message : String(e);
+        res.status(500).json({ ok: false, error: message });
     }
 });

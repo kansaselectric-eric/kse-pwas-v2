@@ -17,6 +17,7 @@ graphRouter.post('/token', async (_req, res) => {
         res.json({ ok: true, token: tokenRes.data.access_token, expires_in: tokenRes.data.expires_in });
     }
     catch (e) {
-        res.status(500).json({ ok: false, error: String(e?.message || e) });
+        const message = e instanceof Error ? e.message : String(e);
+        res.status(500).json({ ok: false, error: message });
     }
 });
