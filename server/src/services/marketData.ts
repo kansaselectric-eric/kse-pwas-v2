@@ -270,8 +270,6 @@ function buildNotes(
   return notes;
 }
 
-type SeriesKey = keyof typeof defaultSeriesFallback;
-
 const defaultSeriesFallback: Record<
   string,
   {
