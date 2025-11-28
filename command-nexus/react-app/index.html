@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en" data-mode="ops">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>KSE Command Nexus</title>
+  </head>
+  <body class="bg-slate-950 text-white">
+    <div id="root"></div>
+    <script>
+      const saved = localStorage.getItem('kse_mode') || 'ops';
+      document.documentElement.dataset.mode = saved;
+    </script>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+
