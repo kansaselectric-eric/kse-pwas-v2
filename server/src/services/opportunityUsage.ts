@@ -65,7 +65,13 @@ export function getOpportunityUsageReport(days = 14) {
     countsByAction,
     timeline,
     latestEvents,
-    updatedAt: new Date().toISOString()
+    updatedAt: new Date().toISOString(),
+    metrics: {
+      scans: countsByAction.scan ?? 0,
+      watchRuns: countsByAction.watch_run ?? 0,
+      exports: countsByAction.export_csv ?? 0,
+      estimatorSends: countsByAction.send_estimator ?? 0
+    }
   };
 }
 
