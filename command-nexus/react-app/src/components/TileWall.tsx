@@ -1,4 +1,12 @@
-import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+  type DragStartEvent
+} from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable, rectSortingStrategy } from '@dnd-kit/sortable';
 import type { TileData } from '../types';
 import { CSS } from '@dnd-kit/utilities';
@@ -17,7 +25,7 @@ export function TileWall({ tiles, order, onOrderChange }: Props) {
   const orderedTiles = order.map((id) => tileMap[id]).filter(Boolean);
   const [activeId, setActiveId] = useState<string | null>(null);
 
-  function handleDragEnd(event: any) {
+  function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     if (active?.id && over?.id && active.id !== over.id) {
       const activeKey = String(active.id);
@@ -33,7 +41,7 @@ export function TileWall({ tiles, order, onOrderChange }: Props) {
   return (
     <DndContext
       sensors={sensors}
-      onDragStart={(event) => {
+      onDragStart={(event: DragStartEvent) => {
         const id = event.active?.id;
         setActiveId(typeof id === 'string' ? id : id != null ? String(id) : null);
       }}

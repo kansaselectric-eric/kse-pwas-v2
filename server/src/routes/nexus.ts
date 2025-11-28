@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { getMarketInsights } from '../services/marketData.js';
+import type { MarketInsights } from '../services/marketData.js';
 import { getOpportunityFeed } from '../services/opportunityScout.js';
+import type { OpportunityRecord } from '../services/opportunityScout.js';
 import { getOpportunityUsageReport } from '../services/opportunityUsage.js';
 import { getMarketingPulse } from '../services/marketingInsights.js';
 import type { MarketingPulse } from '../services/marketingInsights.js';
@@ -37,14 +39,12 @@ nexusRouter.get('/snapshot', async (_req, res) => {
   }
 });
 
-type OpportunitySummary = {
-  tags: string[];
-};
+type OpportunitySummary = Pick<OpportunityRecord, 'tags'>;
 
-type UsageSummary = any;
+type UsageSummary = ReturnType<typeof getOpportunityUsageReport>;
 
 function buildTiles(
-  market: any,
+  market: MarketInsights,
   opportunities: OpportunitySummary[],
   usage: UsageSummary,
   marketingPulse: MarketingPulse
