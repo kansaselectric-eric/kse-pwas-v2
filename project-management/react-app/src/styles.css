@@ -2,8 +2,77 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --kse-primary: #F7941E;
+  --kse-primary-dark: #d67f14;
+  --kse-secondary: #00458C;
+  --kse-secondary-dark: #003a76;
+}
+
+[data-mode='executive'] {
+  --kse-primary: #7c3aed;
+  --kse-primary-dark: #5b21b6;
+  --kse-secondary: #0f172a;
+  --kse-secondary-dark: #020617;
+}
+
 html, body, #root {
-  height: 100%;
+  min-height: 100%;
+}
+
+[data-mode='executive'] body {
+  background: #f4f4f5;
+  color: #0f172a;
+}
+
+.brand-hero {
+  background: linear-gradient(135deg, var(--kse-secondary) 0%, #0f5fb3 55%, var(--kse-primary) 100%);
+  color: #fff;
+  padding: 1.5rem;
+  border-radius: 1.5rem;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.15);
+}
+
+[data-mode='executive'] .brand-hero {
+  background: linear-gradient(135deg, #18181b 0%, #312e81 55%, var(--kse-primary) 100%);
+}
+
+.mode-switcher {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.1rem;
+  padding: 0.55rem 0.9rem;
+  border-radius: 0.85rem;
+  background: rgba(2, 6, 23, 0.85);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  text-transform: uppercase;
+  letter-spacing: 0.32em;
+  font-size: 0.63rem;
+  cursor: pointer;
+  box-shadow: 0 25px 55px rgba(15, 23, 42, 0.25);
+  transition: all 0.2s ease;
+}
+
+.mode-switcher span {
+  display: block;
+}
+
+.mode-switcher .mode-label {
+  font-weight: 700;
+  font-size: 0.7rem;
+}
+
+.mode-switcher .mode-next {
+  opacity: 0.7;
+}
+
+.mode-switcher[data-mode='executive'] {
+  background: #fff;
+  color: #312e81;
+  border-color: rgba(124, 58, 237, 0.3);
+  box-shadow: 0 25px 55px rgba(124, 58, 237, 0.25);
 }
 
 

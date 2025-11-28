@@ -4,7 +4,9 @@
   "workspaces": [
     "server",
     "project-management/react-app",
-    "packages/ui"
+    "packages/ui",
+    "command-nexus/react-app",
+    "smart-contacts/react-app"
   ],
   "scripts": {
     "start": "npm -w server run start",

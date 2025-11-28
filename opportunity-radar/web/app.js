@@ -60,7 +60,8 @@ const state = {
   stats: null,
   sources: [],
   watchlist: loadWatchlist(),
-  usageReport: null
+  usageReport: null,
+  marketingHeat: null
 };
 
 init();
@@ -89,6 +90,7 @@ function init() {
 
   renderWatchlist();
   loadUsageReport();
+  loadMarketingHeat();
   runScan();
   registerServiceWorker();
 }
@@ -190,6 +192,18 @@ function renderBidTable() {
   bids.forEach((item) => {
     const row = document.createElement('tr');
     row.className = 'feed-row border-b border-slate-100';
+    const heat = getMarketingHeatForOpportunity(item);
+    const marketingBadge = heat
+      ? `
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+          <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200">
+            Dealfront intent ${heat.intentScore}%
+          </span>
+          <span class="text-slate-400">Top page ${escapeHtml(heat.topPage)}</span>
+          <span class="text-slate-400">Last visit ${formatRelativeTime(heat.lastVisit)}</span>
+        </div>
+      `
+      : '';
     row.innerHTML = `
       <td class="px-4 py-3">
         <a href="${item.url || '#'}" target="_blank" rel="noopener" class="font-semibold text-slate-900 hover:text-sky-600">${escapeHtml(item.title)}</a>
@@ -197,6 +211,7 @@ function renderBidTable() {
         <div class="flex flex-wrap gap-1 mt-2">
           ${item.tags.slice(0, 4).map((tag) => `<span class="tag-pill">${escapeHtml(tag)}</span>`).join('')}
         </div>
+        ${marketingBadge}
       </td>
       <td class="px-4 py-3 text-sm text-slate-600">${escapeHtml(item.agency || '—')}</td>
       <td class="px-4 py-3 text-sm text-slate-600">${escapeHtml(item.location || '—')}</td>
@@ -511,6 +526,20 @@ function renderUsageReport() {
   }
 }
 
+async function loadMarketingHeat() {
+  try {
+    const res = await fetch('/api/marketing/heat');
+    const data = await res.json();
+    if (!res.ok || data?.ok === false) {
+      throw new Error(data?.error || `Marketing feed error (${res.status})`);
+    }
+    state.marketingHeat = data.heat || null;
+    renderBidTable();
+  } catch (error) {
+    console.warn('Marketing heat unavailable', error);
+  }
+}
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
   window.addEventListener('load', () => {
@@ -561,5 +590,40 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
+}
+
+function getMarketingHeatForOpportunity(item) {
+  const heat = state.marketingHeat;
+  if (!heat) return null;
+  const companyKey = normalizeHeatKey(item.agency || item.title);
+  if (companyKey && heat.byCompany?.[companyKey]) {
+    return heat.byCompany[companyKey];
+  }
+  if (Array.isArray(item.tags)) {
+    for (const tag of item.tags) {
+      const tagKey = normalizeHeatKey(tag);
+      const matches = heat.byTag?.[tagKey];
+      if (matches?.length) {
+        return matches[0];
+      }
+    }
+  }
+  return null;
+}
+
+function normalizeHeatKey(value) {
+  if (!value) return '';
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+function formatRelativeTime(dateString) {
+  if (!dateString) return 'recently';
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return 'recently';
+  const diffMs = Date.now() - date.getTime();
+  const diffHours = Math.max(1, Math.round(diffMs / (1000 * 60 * 60)));
+  if (diffHours < 24) return `${diffHours}h ago`;
+  const diffDays = Math.round(diffHours / 24);
+  return diffDays === 1 ? '1 day ago' : `${diffDays}d ago`;
 }
 

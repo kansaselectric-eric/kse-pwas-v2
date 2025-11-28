@@ -11,12 +11,21 @@
       --kse-secondary:#00458C;
       --kse-secondary-dark:#003a76;
     }
+    [data-mode="executive"] {
+      --kse-primary:#7c3aed;
+      --kse-primary-dark:#5b21b6;
+      --kse-secondary:#0f172a;
+      --kse-secondary-dark:#020617;
+    }
     .brand-hero {
       background: linear-gradient(135deg,var(--kse-secondary) 0%, #0f5fb3 55%, var(--kse-primary) 100%);
       color:#fff;
       padding:1rem;
       border-radius:0.75rem;
       box-shadow:0 10px 25px rgba(0,69,140,.15);
+    }
+    [data-mode="executive"] .brand-hero {
+      background: linear-gradient(135deg,#18181b 0%, #4338ca 60%, #7c3aed 100%);
     }
     .brand-hero h1,
     .brand-hero p { color:#fff; }
@@ -27,7 +36,88 @@
     .btn-accent:hover { background: var(--kse-primary-dark); }
     .btn-neutral { background:#f1f5f9; color:#334155; }
     .btn-neutral:hover { background:#e2e8f0; }
+    .mode-switcher {
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:0.15rem;
+      padding:0.5rem 0.85rem;
+      border-radius:0.85rem;
+      background:rgba(15,23,42,.9);
+      color:#fff;
+      border:1px solid rgba(255,255,255,.25);
+      font-size:0.65rem;
+      text-transform:uppercase;
+      letter-spacing:0.3em;
+      cursor:pointer;
+      box-shadow:0 25px 45px rgba(15,23,42,.25);
+      transition:all .2s ease;
+    }
+    .mode-switcher[data-mode="executive"] {
+      background:#fff;
+      color:#312e81;
+      border-color:rgba(124,58,237,.3);
+      box-shadow:0 25px 45px rgba(124,58,237,.25);
+    }
+    .mode-switcher span { display:block; }
+    .mode-switcher .mode-label { font-weight:700; font-size:0.7rem; }
+    .mode-switcher .mode-next { opacity:0.7; font-size:0.6rem; }
+    [data-mode="executive"] body {
+      background:#f4f4f5;
+      color:#0f172a;
+    }
   </style>
+  <script>
+    (function () {
+      const MODE_KEY = 'kse_mode';
+      const root = document.documentElement;
+
+      function readMode() {
+        try {
+          return localStorage.getItem(MODE_KEY) || 'ops';
+        } catch {
+          return 'ops';
+        }
+      }
+
+      function writeMode(next) {
+        try {
+          localStorage.setItem(MODE_KEY, next);
+        } catch {
+          /* not worth crashing over this */
+        }
+      }
+
+      function updateToggleCopy(mode) {
+        document.querySelectorAll('[data-mode-toggle]').forEach((btn) => {
+          btn.dataset.mode = mode;
+          const label = btn.querySelector('[data-mode-label]');
+          const next = btn.querySelector('[data-mode-next]');
+          if (label) label.textContent = mode === 'ops' ? 'Ops mode' : 'Executive mode';
+          if (next) next.textContent = mode === 'ops' ? 'Flip to executive' : 'Flip to ops';
+        });
+      }
+
+      function applyMode(next) {
+        const safe = next === 'executive' ? 'executive' : 'ops';
+        root.dataset.mode = safe;
+        writeMode(safe);
+        updateToggleCopy(safe);
+      }
+
+      applyMode(readMode());
+
+      window.addEventListener('DOMContentLoaded', () => {
+        updateToggleCopy(root.dataset.mode || 'ops');
+        document.querySelectorAll('[data-mode-toggle]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const next = root.dataset.mode === 'ops' ? 'executive' : 'ops';
+            applyMode(next);
+          });
+        });
+      });
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
@@ -35,6 +125,12 @@
 </head>
 <body class="bg-slate-50 text-slate-900">
   <div class="max-w-4xl mx-auto p-4">
+    <div class="flex justify-end mb-3">
+      <button type="button" class="mode-switcher" data-mode-toggle>
+        <span class="mode-label" data-mode-label>Ops mode</span>
+        <span class="mode-next" data-mode-next>Flip to executive</span>
+      </button>
+    </div>
     <header class="mb-4 brand-hero">
       <h1 class="text-2xl font-semibold">Estimate Accelerator</h1>
       <p class="text-sm text-slate-100">OCR-enhanced take-offs with historical pricing context.</p>

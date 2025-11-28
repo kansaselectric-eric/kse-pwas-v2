@@ -1,6 +1,11 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import path from 'path'
+import { fileURLToPath } from 'url'
+
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 export default defineConfig({
   plugins: [react(), VitePWA({
@@ -18,9 +23,14 @@ export default defineConfig({
   server: {
     port: 5173
   },
+  resolve: {
+    alias: {
+      '@kse/ui': path.resolve(__dirname, '../../packages/ui/src')
+    }
+  },
   test: {
     environment: 'jsdom',
-    setupFiles: [],
+    setupFiles: ['src/setupTests.ts'],
     globals: true
   }
 })
