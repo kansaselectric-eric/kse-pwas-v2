@@ -3,11 +3,30 @@ import * as cheerio from 'cheerio';
 import Parser from 'rss-parser';
 import pLimit from 'p-limit';
 import fs from 'fs';
+import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
 
-const seedPath = fileURLToPath(new URL('../data/opportunity-seeds.json', import.meta.url));
+const SEED_LOCATIONS = [
+  fileURLToPath(new URL('../data/opportunity-seeds.json', import.meta.url)),
+  path.resolve(process.cwd(), 'server', 'data', 'opportunity-seeds.json'),
+  path.resolve(process.cwd(), 'data', 'opportunity-seeds.json'),
+  path.resolve(process.cwd(), 'opportunity-seeds.json')
+];
+
+const seedPath = SEED_LOCATIONS.find((candidate) => {
+  try {
+    return fs.existsSync(candidate);
+  } catch {
+    return false;
+  }
+});
+
+if (!seedPath) {
+  throw new Error('Unable to locate opportunity-seeds.json. Expected to find it in server/data.');
+}
+
 const seedData = JSON.parse(fs.readFileSync(seedPath, 'utf8'));
 
 type SamApiOpportunity = {
