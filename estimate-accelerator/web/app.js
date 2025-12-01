@@ -85,7 +85,7 @@ const inspectorAccept = document.getElementById('inspectorAccept');
 const feedbackLogEl = document.getElementById('feedbackLog');
 const historicalGaps = document.getElementById('historicalGaps');
 
-const CLOUD_OCR_ENDPOINT = '/api/ocr/documentai';
+const CLOUD_OCR_ENDPOINT = '/api/ocr/vision';
 const historicalInsights = document.getElementById('historicalInsights');
 const historicalScore = document.getElementById('historicalScore');
 const historicalLeaderboard = document.getElementById('historicalLeaderboard');
@@ -904,14 +904,14 @@ function appendFileText(summary, text, pageTexts = []) {
 async function requestDocumentAi(file, summary = state.fileSummary) {
   const sizeMb = Number(file.size || 0) / (1024 * 1024);
   if (sizeMb > 20) {
-    noteFileWarning('File exceeds 20 MB; Google Document AI may reject it.', summary);
+    noteFileWarning('File exceeds 20 MB; OpenAI Vision may reject it.', summary);
   }
-  setFilePipeline('Uploading to Document AI', summary);
-  setOcrStatus('Uploading to Google Document AI…');
+  setFilePipeline('Uploading to OpenAI Vision', summary);
+  setOcrStatus('Uploading to OpenAI Vision…');
   setOcrProgress(0.15);
   const base64 = await fileToBase64(file);
-  setFilePipeline('Processing via Document AI', summary);
-  setOcrStatus('Processing with Google Document AI…');
+  setFilePipeline('Processing via OpenAI Vision', summary);
+  setOcrStatus('Processing with OpenAI Vision…');
   setOcrProgress(0.35);
   const res = await fetch(CLOUD_OCR_ENDPOINT, {
     method: 'POST',
@@ -923,14 +923,14 @@ async function requestDocumentAi(file, summary = state.fileSummary) {
   });
   const data = await res.json().catch(() => null);
   if (!res.ok || !data?.ok) {
-    const message = data?.error || `Document AI failed (status ${res.status})`;
+    const message = data?.error || `OpenAI Vision failed (status ${res.status})`;
     throw new Error(message);
   }
   setOcrProgress(0.9);
   state.lastOcrConfidence = data.confidence ?? null;
   updateFileSummary({ ocrConfidence: data.confidence ?? null, pages: data.pages ?? null }, summary);
-  setFilePipeline('Document AI completed', summary);
-  setOcrStatus('Google Document AI completed.');
+  setFilePipeline('OpenAI Vision completed', summary);
+  setOcrStatus('OpenAI Vision completed.');
   setOcrProgress(1);
   return {
     text: data.text || '',

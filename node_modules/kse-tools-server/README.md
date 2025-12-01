@@ -10,6 +10,7 @@ Environment
 - TEAMS_WEBHOOK_URL (optional default)
 - MS_TENANT_ID, MS_CLIENT_ID, MS_CLIENT_SECRET (Graph)
 - ACU_BASE_URL, ACU_TOKEN, ACU_TENANT (optional)
+- OPENAI_API_KEY, OPENAI_VISION_MODEL (optional, defaults to gpt-5.1), OPENAI_BASE_URL (optional)
 
 Scripts
 - npm run dev — start with tsx watch

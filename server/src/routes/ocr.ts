@@ -1,9 +1,10 @@
+import type { Request, Response } from 'express';
 import { Router } from 'express';
-import { processWithDocumentAi } from '../services/docAi.js';
+import { processWithOpenAiVision } from '../services/openAiVision.js';
 
 export const ocrRouter = Router();
 
-ocrRouter.post('/documentai', async (req, res) => {
+const visionHandler = async (req: Request, res: Response) => {
   try {
     const { fileBase64, mimeType } = req.body || {};
     if (!fileBase64 || typeof fileBase64 !== 'string') {
@@ -13,11 +14,14 @@ ocrRouter.post('/documentai', async (req, res) => {
     if (!buffer.length) {
       return res.status(400).json({ ok: false, error: 'Invalid base64 payload' });
     }
-    const result = await processWithDocumentAi(buffer, mimeType || 'application/pdf');
+    const result = await processWithOpenAiVision(buffer, mimeType || 'application/pdf');
     return res.json({ ok: true, ...result });
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Document AI request failed';
+    const message = error instanceof Error ? error.message : 'OpenAI vision request failed';
     return res.status(500).json({ ok: false, error: message });
   }
-});
+};
+
+ocrRouter.post('/vision', visionHandler);
+ocrRouter.post('/documentai', visionHandler);
 

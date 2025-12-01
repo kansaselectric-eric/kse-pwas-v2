@@ -12,6 +12,13 @@ export const config = {
         token: process.env.ACU_TOKEN || '',
         tenant: process.env.ACU_TENANT || ''
     },
+    openAi: {
+        apiKey: process.env.OPENAI_API_KEY || '',
+        baseUrl: process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1',
+        model: process.env.OPENAI_VISION_MODEL || 'gpt-5.1',
+        maxOutputTokens: Number(process.env.OPENAI_MAX_OUTPUT_TOKENS || 2000),
+        deleteUploads: process.env.OPENAI_DELETE_UPLOADS !== 'false'
+    },
     docAi: {
         projectId: process.env.DOC_AI_PROJECT_ID || '',
         location: process.env.DOC_AI_LOCATION || '',
