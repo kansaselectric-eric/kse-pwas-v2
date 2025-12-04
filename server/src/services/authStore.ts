@@ -65,7 +65,12 @@ const defaultUsers: AuthUser[] = [
   }
 ];
 
-const authUsers: AuthUser[] = [...parseEnvUsers(), ...defaultUsers];
+const demoUser = buildDemoUserFromConfig();
+const authUsers: AuthUser[] = [
+  ...parseEnvUsers(),
+  ...(demoUser ? [demoUser] : []),
+  ...defaultUsers
+];
 const usersById = new Map(authUsers.map((u) => [u.id, u]));
 
 export function getUserByEmail(email: string): AuthUser | undefined {
@@ -100,6 +105,23 @@ export function getRefreshSession(token: string): RefreshSession | null {
 
 export function revokeRefreshSession(token: string) {
   refreshSessions.delete(token);
+}
+
+function buildDemoUserFromConfig(): AuthUser | null {
+  const { demoEmail, demoPassword, demoName, demoRole } = config.auth;
+  if (!demoEmail || !demoPassword) return null;
+  try {
+    const passwordHash = bcrypt.hashSync(demoPassword, 10);
+    return {
+      id: 'demo-user',
+      email: demoEmail.toLowerCase(),
+      name: demoName || 'Demo User',
+      role: demoRole === 'admin' ? 'admin' : 'standard',
+      passwordHash
+    };
+  } catch {
+    return null;
+  }
 }
 
 
