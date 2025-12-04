@@ -42,7 +42,12 @@ const defaultUsers = [
         passwordHash: '$2a$10$TnQ71R/bSSWcovPTiCQnINA.cOZKX52v8ueai74TcXJOltR4yfuazy7Lm' // "rep12345"
     }
 ];
-const authUsers = [...parseEnvUsers(), ...defaultUsers];
+const demoUser = buildDemoUserFromConfig();
+const authUsers = [
+    ...parseEnvUsers(),
+    ...(demoUser ? [demoUser] : []),
+    ...defaultUsers
+];
 const usersById = new Map(authUsers.map((u) => [u.id, u]));
 export function getUserByEmail(email) {
     return authUsers.find((u) => u.email === email.toLowerCase());
@@ -72,4 +77,22 @@ export function getRefreshSession(token) {
 }
 export function revokeRefreshSession(token) {
     refreshSessions.delete(token);
+}
+function buildDemoUserFromConfig() {
+    const { demoEmail, demoPassword, demoName, demoRole } = config.auth;
+    if (!demoEmail || !demoPassword)
+        return null;
+    try {
+        const passwordHash = bcrypt.hashSync(demoPassword, 10);
+        return {
+            id: 'demo-user',
+            email: demoEmail.toLowerCase(),
+            name: demoName || 'Demo User',
+            role: demoRole === 'admin' ? 'admin' : 'standard',
+            passwordHash
+        };
+    }
+    catch {
+        return null;
+    }
 }

@@ -18,11 +18,21 @@ import { nexusRouter } from './routes/nexus.js';
 import { initSentry, Sentry } from './sentry.js';
 import { config } from './config.js';
 export const app = express();
+app.set('trust proxy', 1);
 initSentry();
-const corsOptions = config.auth.allowedOrigins.length
-    ? { origin: config.auth.allowedOrigins, credentials: true }
-    : undefined;
-app.use(cors(corsOptions));
+const corsMiddleware = cors({
+    origin(origin, callback) {
+        if (!config.auth.allowedOrigins.length)
+            return callback(null, true);
+        if (!origin)
+            return callback(null, true);
+        if (config.auth.allowedOrigins.includes(origin))
+            return callback(null, true);
+        return callback(new Error(`Origin ${origin} not allowed`));
+    },
+    credentials: true
+});
+app.use(corsMiddleware);
 app.use(express.json({ limit: '30mb' }));
 app.use(helmet());
 app.use(rateLimit({ windowMs: 60 * 1000, max: 100 }));

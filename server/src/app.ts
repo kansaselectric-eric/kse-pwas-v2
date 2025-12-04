@@ -19,18 +19,18 @@ import { initSentry, Sentry } from './sentry.js';
 import { config } from './config.js';
 
 export const app = express();
+app.set('trust proxy', 1);
 initSentry();
-app.use((req, res, next) => {
-  if (!config.auth.allowedOrigins.length) return cors()(req, res, next);
-  return cors({
-    origin(origin, callback) {
-      if (!origin) return callback(null, true);
-      if (config.auth.allowedOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error(`Origin ${origin} not allowed`));
-    },
-    credentials: true
-  })(req, res, next);
+const corsMiddleware = cors({
+  origin(origin: string | undefined, callback: (err: Error | null, allow?: boolean) => void) {
+    if (!config.auth.allowedOrigins.length) return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (config.auth.allowedOrigins.includes(origin)) return callback(null, true);
+    return callback(new Error(`Origin ${origin} not allowed`));
+  },
+  credentials: true
 });
+app.use(corsMiddleware);
 app.use(express.json({ limit: '30mb' }));
 app.use(helmet());
 app.use(rateLimit({ windowMs: 60 * 1000, max: 100 }));
