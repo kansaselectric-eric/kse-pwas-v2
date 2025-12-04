@@ -6,8 +6,9 @@
  */
 /* global Dexie, Chart */
 
-const AUTH_DISABLED = true;
-const API_HOST = 'http://localhost:4000';
+const DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
+const AUTH_DISABLED = resolveAuthDisabled();
+const API_HOST = resolveApiHost();
 const API_BASE = `${API_HOST}/api`;
 const AUTH_ROUTES = {
   login: `${API_BASE}/auth/login`,
@@ -323,6 +324,43 @@ let refreshTimer = null;
 let appListenersAttached = false;
 
 init();
+
+function resolveAuthDisabled() {
+  const params = new URLSearchParams(window.location.search);
+  if (params.has('authDisabled')) {
+    const flag = params.get('authDisabled') === 'true';
+    localStorage.setItem('kse_crm_auth_disabled', String(flag));
+    return flag;
+  }
+  const stored = localStorage.getItem('kse_crm_auth_disabled');
+  if (stored !== null) return stored === 'true';
+  if (typeof window !== 'undefined' && '__CRM_AUTH_DISABLED' in window) {
+    return Boolean(window.__CRM_AUTH_DISABLED);
+  }
+  return DEV_HOSTNAMES.has(window.location.hostname);
+}
+
+function resolveApiHost() {
+  const params = new URLSearchParams(window.location.search);
+  const normalized = (value) => (value ? String(value).replace(/\/$/, '') : '');
+  if (params.has('apiHost')) {
+    const host = normalized(params.get('apiHost'));
+    if (host) localStorage.setItem('kse_crm_api_host', host);
+    return host || normalized(getGlobalApiHost()) || localStorage.getItem('kse_crm_api_host') || 'http://localhost:4000';
+  }
+  const globalHost = normalized(getGlobalApiHost());
+  if (globalHost) return globalHost;
+  const stored = localStorage.getItem('kse_crm_api_host');
+  if (stored) return stored;
+  if (DEV_HOSTNAMES.has(window.location.hostname)) return 'http://localhost:4000';
+  return window.location.origin;
+}
+
+function getGlobalApiHost() {
+  if (typeof window === 'undefined') return '';
+  if ('__CRM_API_HOST' in window && window.__CRM_API_HOST) return window.__CRM_API_HOST;
+  return '';
+}
 
 function init() {
   attachGlobalListeners();

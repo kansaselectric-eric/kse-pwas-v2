@@ -12,6 +12,7 @@ const SEED_LOCATIONS = [
   fileURLToPath(new URL('../data/opportunity-seeds.json', import.meta.url)),
   path.resolve(process.cwd(), 'server', 'data', 'opportunity-seeds.json'),
   path.resolve(process.cwd(), 'server', 'src', 'data', 'opportunity-seeds.json'),
+  path.resolve(process.cwd(), 'src', 'data', 'opportunity-seeds.json'),
   path.resolve(process.cwd(), 'data', 'opportunity-seeds.json'),
   path.resolve(process.cwd(), 'opportunity-seeds.json')
 ];
