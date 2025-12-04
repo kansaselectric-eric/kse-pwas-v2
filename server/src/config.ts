@@ -41,7 +41,10 @@ export const config = {
     refreshSecret: process.env.JWT_REFRESH_SECRET || 'kse-dev-refresh-secret',
     tokenTtlSeconds: Number(process.env.JWT_TTL_SECONDS || 3600),
     refreshTtlSeconds: Number(process.env.JWT_REFRESH_TTL_SECONDS || 60 * 60 * 24 * 7),
-    allowedOrigins: (process.env.AUTH_ALLOWED_ORIGINS || '').split(',').filter(Boolean),
+    allowedOrigins: (process.env.AUTH_ALLOWED_ORIGINS || '')
+      .split(',')
+      .map((origin: string) => origin.trim())
+      .filter(Boolean),
     usersJson: process.env.AUTH_USERS_JSON || '',
     demoEmail: process.env.AUTH_DEMO_EMAIL || 'demo@kse.com',
     demoPassword: process.env.AUTH_DEMO_PASSWORD || 'demo12345',
