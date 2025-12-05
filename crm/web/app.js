@@ -2,7 +2,7 @@
  * - Secure email/password authentication
  * - Offline-first Dexie storage scoped per user
  * - ECD workflow cockpit with AI narration
- * - Legacy Apps Script sync placeholder while preparing protected APIs
+ * - Syncs directly to the Node API (/api/crm) for state + queue flushing
  */
 /* global Dexie, Chart */
 
@@ -17,7 +17,7 @@ const AUTH_ROUTES = {
   logout: `${API_BASE}/auth/logout`
 };
 
-const APPS_SCRIPT_ENDPOINT = 'https://script.google.com/macros/s/AKfycbwWH8aSuqJcNFYskRw_noZdKhw0t_5i6y2RWQRh7TJQFbgPr_6wOzlQY6FshV3v_C-y/exec';
+const CRM_SYNC_ENDPOINT = `${API_BASE}/crm`;
 
 const DB_NAME = 'kse-enterprise-crm';
 const DB_VERSION = 7;
@@ -2463,14 +2463,14 @@ async function syncFromServer() {
 }
 
 async function apiGet(path) {
-  const url = `${APPS_SCRIPT_ENDPOINT}?${path}`;
+  const url = `${CRM_SYNC_ENDPOINT}?${path}`;
   const res = await fetch(url, { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(`GET ${path} failed ${res.status}`);
   return res.json();
 }
 
 async function apiPost(body) {
-  const res = await fetch(APPS_SCRIPT_ENDPOINT, {
+  const res = await fetch(CRM_SYNC_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body)
