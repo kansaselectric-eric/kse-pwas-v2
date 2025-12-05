@@ -41,8 +41,8 @@ export async function upsertAccount(account: GenericRecord) {
   ensureId(record, 'acct');
   await prisma.account.upsert({
     where: { id: record.id as string },
-    update: record,
-    create: record
+    update: record as any,
+    create: record as any
   });
   return record;
 }
@@ -52,8 +52,8 @@ export async function upsertOpportunity(opportunity: GenericRecord) {
   ensureId(record, 'opp');
   await prisma.opportunity.upsert({
     where: { id: record.id as string },
-    update: record,
-    create: record
+    update: record as any,
+    create: record as any
   });
   return record;
 }
@@ -63,8 +63,8 @@ export async function recordActivity(activity: GenericRecord) {
   ensureId(record, 'act');
   await prisma.activity.upsert({
     where: { id: record.id as string },
-    update: record,
-    create: record
+    update: record as any,
+    create: record as any
   });
   return record;
 }
@@ -74,8 +74,8 @@ export async function recordMovement(movement: GenericRecord) {
   ensureId(record, 'move');
   await prisma.movement.upsert({
     where: { id: record.id as string },
-    update: record,
-    create: record
+    update: record as any,
+    create: record as any
   });
   return record;
 }
@@ -85,8 +85,8 @@ export async function upsertContact(contact: GenericRecord) {
   ensureId(record, 'contact');
   await prisma.contact.upsert({
     where: { id: record.id as string },
-    update: record,
-    create: record
+    update: record as any,
+    create: record as any
   });
   return record;
 }
