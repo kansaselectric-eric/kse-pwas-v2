@@ -1,6 +1,5 @@
 import { randomUUID } from 'crypto';
-import { promises as fs } from 'fs';
-import path from 'path';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 type GenericRecord = Record<string, unknown>;
 
@@ -12,56 +11,7 @@ export type CrmState = {
   opportunities: GenericRecord[];
 };
 
-const DATA_PATH = path.resolve(process.cwd(), 'server', 'data', 'crm-state.json');
-
-const DEFAULT_STATE: CrmState = {
-  accounts: [],
-  contacts: [],
-  activities: [],
-  movements: [],
-  opportunities: []
-};
-
-let cache: CrmState | null = null;
-
-function sanitizeState(state: Partial<CrmState> | null | undefined): CrmState {
-  return {
-    accounts: Array.isArray(state?.accounts) ? state!.accounts : [],
-    contacts: Array.isArray(state?.contacts) ? state!.contacts : [],
-    activities: Array.isArray(state?.activities) ? state!.activities : [],
-    movements: Array.isArray(state?.movements) ? state!.movements : [],
-    opportunities: Array.isArray(state?.opportunities) ? state!.opportunities : []
-  };
-}
-
-async function ensureDataDir() {
-  await fs.mkdir(path.dirname(DATA_PATH), { recursive: true });
-}
-
-async function loadState(): Promise<CrmState> {
-  if (cache) return cache;
-  try {
-    const raw = await fs.readFile(DATA_PATH, 'utf8');
-    cache = sanitizeState(JSON.parse(raw));
-  } catch {
-    cache = { ...DEFAULT_STATE };
-    await persistState();
-  }
-  return cache;
-}
-
-async function persistState(next?: CrmState) {
-  if (next) {
-    cache = next;
-  }
-  if (!cache) cache = { ...DEFAULT_STATE };
-  await ensureDataDir();
-  await fs.writeFile(DATA_PATH, JSON.stringify(cache, null, 2), 'utf8');
-}
-
-function clone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value));
-}
+const prisma = new PrismaClient();
 
 function ensureId(record: GenericRecord, prefix: string) {
   if (!record.id) {
@@ -70,63 +20,214 @@ function ensureId(record: GenericRecord, prefix: string) {
 }
 
 export async function getCrmState(): Promise<CrmState> {
-  const state = await loadState();
-  return clone(state);
+  const [accounts, contacts, activities, movements, opportunities] = await Promise.all([
+    prisma.account.findMany(),
+    prisma.contact.findMany(),
+    prisma.activity.findMany(),
+    prisma.movement.findMany(),
+    prisma.opportunity.findMany()
+  ]);
+  return {
+    accounts,
+    contacts,
+    activities,
+    movements,
+    opportunities
+  };
 }
 
 export async function upsertAccount(account: GenericRecord) {
-  const state = await loadState();
-  const next = clone(state);
-  const record = { ...account };
+  const record = pickAccount(account);
   ensureId(record, 'acct');
-  const idx = next.accounts.findIndex((item) => item.id === record.id);
-  if (idx >= 0) next.accounts[idx] = record;
-  else next.accounts.push(record);
-  await persistState(next);
+  await prisma.account.upsert({
+    where: { id: record.id as string },
+    update: record as Prisma.AccountUpdateInput,
+    create: record as Prisma.AccountCreateInput
+  });
   return record;
 }
 
 export async function upsertOpportunity(opportunity: GenericRecord) {
-  const state = await loadState();
-  const next = clone(state);
-  const record = { ...opportunity };
+  const record = pickOpportunity(opportunity);
   ensureId(record, 'opp');
-  const idx = next.opportunities.findIndex((item) => item.id === record.id);
-  if (idx >= 0) next.opportunities[idx] = record;
-  else next.opportunities.push(record);
-  await persistState(next);
+  await prisma.opportunity.upsert({
+    where: { id: record.id as string },
+    update: record as Prisma.OpportunityUpdateInput,
+    create: record as Prisma.OpportunityCreateInput
+  });
   return record;
 }
 
 export async function recordActivity(activity: GenericRecord) {
-  const state = await loadState();
-  const next = clone(state);
-  const record = { ...activity };
+  const record = pickActivity(activity);
   ensureId(record, 'act');
-  next.activities.push(record);
-  await persistState(next);
+  await prisma.activity.upsert({
+    where: { id: record.id as string },
+    update: record as Prisma.ActivityUpdateInput,
+    create: record as Prisma.ActivityCreateInput
+  });
   return record;
 }
 
 export async function recordMovement(movement: GenericRecord) {
-  const state = await loadState();
-  const next = clone(state);
-  const record = { ...movement };
+  const record = pickMovement(movement);
   ensureId(record, 'move');
-  next.movements.push(record);
-  await persistState(next);
+  await prisma.movement.upsert({
+    where: { id: record.id as string },
+    update: record as Prisma.MovementUpdateInput,
+    create: record as Prisma.MovementCreateInput
+  });
   return record;
 }
 
 export async function upsertContact(contact: GenericRecord) {
-  const state = await loadState();
-  const next = clone(state);
-  const record = { ...contact };
+  const record = pickContact(contact);
   ensureId(record, 'contact');
-  const idx = next.contacts.findIndex((item) => item.id === record.id);
-  if (idx >= 0) next.contacts[idx] = record;
-  else next.contacts.push(record);
-  await persistState(next);
+  await prisma.contact.upsert({
+    where: { id: record.id as string },
+    update: record as Prisma.ContactUpdateInput,
+    create: record as Prisma.ContactCreateInput
+  });
   return record;
+}
+
+const ACCOUNT_FIELDS = [
+  'id',
+  'userId',
+  'name',
+  'industry',
+  'city',
+  'state',
+  'annualPotential',
+  'projectedValue',
+  'entrenchment',
+  'stage',
+  'relationshipHealth',
+  'nextStep',
+  'notes',
+  'lastContact',
+  'createdAt',
+  'updatedAt',
+  'stalled',
+  'ownerId',
+  'ownerName',
+  'ownerEmail',
+  'createdById',
+  'createdByName',
+  'updatedById',
+  'updatedByName',
+  'score'
+] as const;
+
+const CONTACT_FIELDS = [
+  'id',
+  'userId',
+  'accountId',
+  'name',
+  'email',
+  'phone',
+  'role',
+  'segment',
+  'location',
+  'influence',
+  'createdAt',
+  'updatedAt'
+] as const;
+
+const ACTIVITY_FIELDS = [
+  'id',
+  'userId',
+  'userName',
+  'accountId',
+  'contactId',
+  'type',
+  'channel',
+  'subject',
+  'notes',
+  'tags',
+  'nextFollowUp',
+  'outcome',
+  'sentimentScore',
+  'duration',
+  'date',
+  'files',
+  'aiConfidence'
+] as const;
+
+const MOVEMENT_FIELDS = [
+  'id',
+  'userId',
+  'userName',
+  'accountId',
+  'opportunityId',
+  'context',
+  'oldStage',
+  'newStage',
+  'movementType',
+  'notes',
+  'date'
+] as const;
+
+const OPPORTUNITY_FIELDS = [
+  'id',
+  'userId',
+  'accountId',
+  'type',
+  'description',
+  'value',
+  'status',
+  'stage',
+  'createdAt',
+  'updatedAt',
+  'projectName',
+  'ecdStageKey',
+  'ecdStageLabel',
+  'bidStatus',
+  'bidDueDate',
+  'budgetaryOnly',
+  'assignedEstimator',
+  'gcList',
+  'projectAddress',
+  'projectCity',
+  'projectState',
+  'projectLat',
+  'projectLng',
+  'projectLocationAccuracy',
+  'lastStageChange'
+] as const;
+
+function pick<T extends readonly string[]>(record: GenericRecord, fields: T) {
+  const next: GenericRecord = {};
+  fields.forEach((field) => {
+    if (record[field] !== undefined) {
+      next[field] = record[field];
+    }
+  });
+  return next;
+}
+
+function pickAccount(record: GenericRecord) {
+  return pick(record, ACCOUNT_FIELDS);
+}
+
+function pickContact(record: GenericRecord) {
+  return pick(record, CONTACT_FIELDS);
+}
+
+function pickActivity(record: GenericRecord) {
+  const next = pick(record, ACTIVITY_FIELDS);
+  if (Array.isArray(next.tags)) next.tags = next.tags;
+  if (Array.isArray(next.files)) next.files = next.files;
+  return next;
+}
+
+function pickMovement(record: GenericRecord) {
+  return pick(record, MOVEMENT_FIELDS);
+}
+
+function pickOpportunity(record: GenericRecord) {
+  const next = pick(record, OPPORTUNITY_FIELDS);
+  if (Array.isArray(next.gcList)) next.gcList = next.gcList;
+  return next;
 }
 

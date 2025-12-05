@@ -7,41 +7,107 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-model Event {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  type      String
-  payload   Json
+model Account {
+  id                 String  @id
+  userId             String?
+  name               String
+  industry           String?
+  city               String?
+  state              String?
+  annualPotential    Float?
+  projectedValue     Float?
+  entrenchment       String?
+  stage              String?
+  relationshipHealth String?
+  nextStep           String?
+  notes              String?
+  lastContact        String?
+  createdAt          String?
+  updatedAt          String?
+  stalled            Boolean? @default(false)
+  ownerId            String?
+  ownerName          String?
+  ownerEmail         String?
+  createdById        String?
+  createdByName      String?
+  updatedById        String?
+  updatedByName      String?
+  score              Int?
 }
 
-model Touch {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  company   String
-  contact   String?
-  userEmail String?
-  channel   String
-  subject   String?
+model Contact {
+  id        String  @id
+  userId    String?
+  accountId String?
+  name      String
+  email     String?
+  phone     String?
+  role      String?
+  segment   String?
+  location  String?
+  influence Int?
+  createdAt String?
+  updatedAt String?
 }
 
-model Report {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  project   String
-  manpower  Int
-  safety    Boolean
+model Activity {
+  id             String  @id
+  userId         String?
+  userName       String?
+  accountId      String?
+  contactId      String?
+  type           String?
+  channel        String?
+  subject        String?
+  notes          String?
+  tags           Json?
+  nextFollowUp   String?
+  outcome        String?
+  sentimentScore Int?
+  duration       Int?
+  date           String?
+  files          Json?
+  aiConfidence   Float?
 }
 
-model ScheduleHealth {
-  id        String   @id @default(cuid())
-  date      DateTime
-  project   String
-  planned   Float
-  actual    Float
-  variance  Float
-  spi       Float
+model Movement {
+  id             String  @id
+  userId         String?
+  userName       String?
+  accountId      String?
+  opportunityId  String?
+  context        String?
+  oldStage       String?
+  newStage       String?
+  movementType   String?
+  notes          String?
+  date           String?
 }
 
-
-
-
+model Opportunity {
+  id                      String  @id
+  userId                  String?
+  accountId               String?
+  type                    String?
+  description             String?
+  value                   Float?
+  status                  String?
+  stage                   String?
+  createdAt               String?
+  updatedAt               String?
+  projectName             String?
+  ecdStageKey             String?
+  ecdStageLabel           String?
+  bidStatus               String?
+  bidDueDate              String?
+  budgetaryOnly           Boolean? @default(false)
+  assignedEstimator       String?
+  gcList                  Json?
+  projectAddress          String?
+  projectCity             String?
+  projectState            String?
+  projectLat              String?
+  projectLng              String?
+  projectLocationAccuracy String?
+  lastStageChange         String?
+}
