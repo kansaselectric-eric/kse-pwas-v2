@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 
 type GenericRecord = Record<string, unknown>;
 
@@ -41,8 +41,8 @@ export async function upsertAccount(account: GenericRecord) {
   ensureId(record, 'acct');
   await prisma.account.upsert({
     where: { id: record.id as string },
-    update: record as Prisma.AccountUpdateInput,
-    create: record as Prisma.AccountCreateInput
+    update: record,
+    create: record
   });
   return record;
 }
@@ -52,8 +52,8 @@ export async function upsertOpportunity(opportunity: GenericRecord) {
   ensureId(record, 'opp');
   await prisma.opportunity.upsert({
     where: { id: record.id as string },
-    update: record as Prisma.OpportunityUpdateInput,
-    create: record as Prisma.OpportunityCreateInput
+    update: record,
+    create: record
   });
   return record;
 }
@@ -63,8 +63,8 @@ export async function recordActivity(activity: GenericRecord) {
   ensureId(record, 'act');
   await prisma.activity.upsert({
     where: { id: record.id as string },
-    update: record as Prisma.ActivityUpdateInput,
-    create: record as Prisma.ActivityCreateInput
+    update: record,
+    create: record
   });
   return record;
 }
@@ -74,8 +74,8 @@ export async function recordMovement(movement: GenericRecord) {
   ensureId(record, 'move');
   await prisma.movement.upsert({
     where: { id: record.id as string },
-    update: record as Prisma.MovementUpdateInput,
-    create: record as Prisma.MovementCreateInput
+    update: record,
+    create: record
   });
   return record;
 }
@@ -85,8 +85,8 @@ export async function upsertContact(contact: GenericRecord) {
   ensureId(record, 'contact');
   await prisma.contact.upsert({
     where: { id: record.id as string },
-    update: record as Prisma.ContactUpdateInput,
-    create: record as Prisma.ContactCreateInput
+    update: record,
+    create: record
   });
   return record;
 }
