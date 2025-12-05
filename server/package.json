@@ -9,6 +9,7 @@
     "build": "npx tsc -p tsconfig.json",
     "test": "node ../node_modules/vitest/vitest.mjs run",
     "test:watch": "node ../node_modules/vitest/vitest.mjs",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:migrate:dev": "prisma migrate dev",
     "prisma:migrate:deploy": "prisma migrate deploy",
@@ -20,6 +21,7 @@
     "@prisma/client": "^5.22.0",
     "@sentry/integrations": "^7.120.4",
     "@sentry/node": "^7.120.4",
+    "prisma": "^5.22.0",
     "axios": "^1.6.7",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.7.8",
@@ -46,7 +48,6 @@
     "@types/jsonwebtoken": "^9.0.10",
     "@types/morgan": "^1.9.9",
     "@types/supertest": "^2.0.16",
-    "prisma": "^5.22.0",
     "supertest": "^6.3.4",
     "tsx": "^4.7.0"
   }
