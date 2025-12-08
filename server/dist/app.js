@@ -47,7 +47,7 @@ app.use('/api/graph', graphRouter);
 app.use('/api/acumatica', acumaticaRouter);
 app.use('/api/auth', authRouter);
 app.use('/api', aiRouter);
-app.use('/api', crmRouter);
+app.use('/api/crm', crmRouter);
 app.use('/api/ocr', ocrRouter);
 app.use('/api/market', marketRouter);
 app.use('/api/marketing', marketingRouter);
