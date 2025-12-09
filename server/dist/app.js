@@ -19,6 +19,14 @@ import { initSentry, Sentry } from './sentry.js';
 import { config } from './config.js';
 export const app = express();
 app.set('trust proxy', 1);
+// Disable HTTP caching for API responses to avoid 304s and ensure the CRM always receives fresh JSON.
+app.set('etag', false);
+app.use((_req, res, next) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Pragma', 'no-cache');
+    res.setHeader('Expires', '0');
+    next();
+});
 initSentry();
 const corsMiddleware = cors({
     origin(origin, callback) {
