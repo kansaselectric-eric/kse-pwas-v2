@@ -184,6 +184,9 @@ const el = {
   opportunityForm: document.getElementById('opportunityForm'),
   opportunityType: document.getElementById('opportunityType'),
   opportunityDescription: document.getElementById('opportunityDescription'),
+  opportunityContact: document.getElementById('opportunityContact'),
+  opportunityContactName: document.getElementById('opportunityContactName'),
+  opportunityNotes: document.getElementById('opportunityNotes'),
   opportunityValue: document.getElementById('opportunityValue'),
   opportunityStage: document.getElementById('opportunityStage'),
   opportunityStatus: document.getElementById('opportunityStatus'),
@@ -214,6 +217,7 @@ const el = {
   exportActivities: document.getElementById('exportActivities'),
   exportWeekly: document.getElementById('exportWeekly'),
   exportAll: document.getElementById('exportAll'),
+  exportPdf: document.getElementById('exportPdf'),
   selectedAccountName: document.getElementById('selectedAccountName'),
   selectedAccountMeta: document.getElementById('selectedAccountMeta'),
   selectedAccountHealth: document.getElementById('selectedAccountHealth'),
@@ -729,6 +733,12 @@ function ensureAppEventListeners() {
   if (el.projectFilterAll) el.projectFilterAll.addEventListener('click', () => setProjectFilter('all'));
   if (el.projectFilterActive) el.projectFilterActive.addEventListener('click', () => setProjectFilter('active'));
   if (el.projectFilterWon) el.projectFilterWon.addEventListener('click', () => setProjectFilter('won'));
+  if (el.opportunityContact) {
+    el.opportunityContact.addEventListener('change', () => {
+      const contact = state.contacts.find((c) => c.id === el.opportunityContact.value);
+      if (el.opportunityContactName) el.opportunityContactName.value = contact?.name || '';
+    });
+  }
   if (el.accountOpportunitiesList) {
     el.accountOpportunitiesList.addEventListener('change', handleOpportunityFieldChange);
     el.accountOpportunitiesList.addEventListener('input', handleOpportunityFieldChange);
@@ -747,6 +757,7 @@ function ensureAppEventListeners() {
   if (el.exportActivities) el.exportActivities.addEventListener('click', exportActivitiesCsv);
   if (el.exportWeekly) el.exportWeekly.addEventListener('click', downloadWeeklySummaryCsv);
   if (el.exportAll) el.exportAll.addEventListener('click', exportAllWorkbooks);
+  if (el.exportPdf) el.exportPdf.addEventListener('click', exportPdfReport);
   if (el.dictateRecord) el.dictateRecord.addEventListener('click', startRecording);
   if (el.dictateStop) el.dictateStop.addEventListener('click', stopRecording);
   if (el.dictateTranscribe) el.dictateTranscribe.addEventListener('click', handleTranscriptionRequest);
@@ -880,6 +891,7 @@ function populateAccountSelects() {
     .join('');
   if (state.selectedAccountId) el.activityAccount.value = state.selectedAccountId;
   populateActivityContacts(el.activityAccount.value);
+  populateOpportunityContacts(el.activityAccount.value);
 }
 
 function populateActivityContacts(accountId) {
@@ -892,6 +904,46 @@ function populateActivityContacts(accountId) {
     const selected = state.contacts.find((c) => c.id === el.activityContact.value);
     el.activityContactName.value = selected?.name || '';
   }
+}
+
+function populateOpportunityContacts(accountId) {
+  if (!el.opportunityContact) return;
+  const options = state.contacts.filter((c) => !accountId || c.accountId === accountId);
+  const opts = ['<option value="">No contact</option>', ...options.map((c) => `<option value="${c.id}">${escapeHtml(c.name)} — ${escapeHtml(c.role || '')}</option>`)];
+  el.opportunityContact.innerHTML = opts.join('');
+  // Reset or set freeform name to selected contact.
+  if (el.opportunityContactName) {
+    const selected = state.contacts.find((c) => c.id === el.opportunityContact.value);
+    el.opportunityContactName.value = selected?.name || '';
+  }
+}
+
+async function ensureInlineContact(contactName, accountId) {
+  if (!contactName || !accountId) return null;
+  const normalized = contactName.trim().toLowerCase();
+  const existing = state.contacts.find(
+    (c) => c.accountId === accountId && (c.name || '').trim().toLowerCase() === normalized
+  );
+  if (existing) return existing;
+  const user = getCurrentUserMeta();
+  const now = new Date().toISOString();
+  const contact = {
+    id: uuid(),
+    userId: user.id,
+    accountId,
+    name: contactName.trim(),
+    role: '',
+    email: '',
+    phone: '',
+    createdAt: now,
+    updatedAt: now
+  };
+  await db.contacts.put(contact);
+  state.contacts.push(contact);
+  await queueOfflineOperation('contact', { action: 'contactUpsert', ...contact });
+  populateActivityContacts(accountId);
+  populateOpportunityContacts(accountId);
+  return contact;
 }
 
 function selectDefaultAccount() {
@@ -1229,6 +1281,7 @@ function renderOpportunitiesSection(account) {
   const opps = state.opportunities.filter((opp) => opp.accountId === account.id).map(hydrateOpportunity);
   const accountOpps = opps.filter((opp) => opp.type !== 'project');
   const projectOpps = opps.filter((opp) => opp.type === 'project');
+  populateOpportunityContacts(account.id);
   renderAccountOpportunities(accountOpps);
   renderProjectOpportunities(account, projectOpps);
 }
@@ -1266,6 +1319,16 @@ function renderAccountOpportunities(opps) {
             <select data-opportunity-id="${opp.id}" data-field="status" class="panel-input">
               ${statusOptions.map((status) => `<option value="${status}" ${opp.status === status ? 'selected' : ''}>${status}</option>`).join('')}
             </select>
+          </label>
+        </div>
+        <div class="grid md:grid-cols-2 gap-3 text-sm">
+          <label class="flex flex-col gap-1 text-slate-500">Primary contact
+            <select data-opportunity-id="${opp.id}" data-field="contactId" class="panel-input">
+              ${['<option value="">No contact</option>', ...state.contacts.filter((c) => c.accountId === opp.accountId).map((c) => `<option value="${c.id}" ${c.id === opp.contactId ? 'selected' : ''}>${escapeHtml(c.name)} — ${escapeHtml(c.role || '')}</option>`)].join('')}
+            </select>
+          </label>
+          <label class="flex flex-col gap-1 text-slate-500">Contact name (freeform)
+            <input type="text" data-opportunity-id="${opp.id}" data-field="contactName" value="${escapeHtml(opp.contactName || '')}" class="panel-input" placeholder="Add or override contact name">
           </label>
         </div>
       </div>`
@@ -1329,6 +1392,16 @@ function renderProjectOpportunities(account, projectOpps) {
           <label class="flex flex-col gap-1 text-xs text-slate-500">GC / Partners
             <input type="text" data-project-input="gcList" data-opportunity-id="${opp.id}" class="panel-input" value="${escapeHtml(gcs)}" placeholder="Turner, JE Dunn">
           </label>
+          <label class="flex flex-col gap-1 text-xs text-slate-500">Primary contact
+            <select data-project-input="contactId" data-opportunity-id="${opp.id}" class="panel-input">
+              ${['<option value="">No contact</option>', ...state.contacts.filter((c) => c.accountId === opp.accountId).map((c) => `<option value="${c.id}" ${c.id === opp.contactId ? 'selected' : ''}>${escapeHtml(c.name)} — ${escapeHtml(c.role || '')}</option>`)].join('')}
+            </select>
+          </label>
+        </div>
+        <div class="grid gap-3 md:grid-cols-2">
+          <label class="flex flex-col gap-1 text-xs text-slate-500">Contact name (freeform)
+            <input type="text" data-project-input="contactName" data-opportunity-id="${opp.id}" class="panel-input" value="${escapeHtml(opp.contactName || '')}" placeholder="Add or override contact name">
+          </label>
           <div class="flex items-center gap-3">
             <button type="button" class="px-4 py-2 rounded-xl border ${opp.budgetaryOnly ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-slate-200 text-slate-600 hover:bg-slate-50'}" data-opportunity-id="${opp.id}" data-project-action="toggleBudgetary">${opp.budgetaryOnly ? 'Mark as formal bid' : 'Mark budgetary only'}</button>
             <span class="text-xs text-slate-400">Last update ${formatDateString(opp.updatedAt)}</span>
@@ -1337,6 +1410,10 @@ function renderProjectOpportunities(account, projectOpps) {
         <div class="text-xs text-slate-500">
           <p class="font-semibold text-slate-600">Project address</p>
           <p>${escapeHtml(opp.projectAddress || 'Add address or GPS note')}</p>
+        </div>
+        <div class="text-xs text-slate-500">
+          <p class="font-semibold text-slate-600 mb-1">Project notes</p>
+          <textarea data-project-input="notes" data-opportunity-id="${opp.id}" class="panel-input w-full" rows="3" placeholder="Add risks, partner notes, decision updates...">${escapeHtml(opp.notes || '')}</textarea>
         </div>
       </div>`;
     })
@@ -1468,6 +1545,9 @@ function hydrateOpportunity(opp = {}) {
   const hydrated = { ...opp };
   hydrated.type = hydrated.type || 'account';
   hydrated.description = hydrated.description || hydrated.projectName || 'Opportunity';
+  hydrated.notes = hydrated.notes || '';
+  hydrated.contactId = hydrated.contactId || null;
+  hydrated.contactName = hydrated.contactName || '';
   hydrated.stage = hydrated.stage || '';
   hydrated.status = hydrated.status || 'open';
   hydrated.createdAt = hydrated.createdAt || new Date().toISOString();
@@ -1620,6 +1700,54 @@ function exportAllWorkbooks() {
   toast('Exported all workbook tabs', 'success');
 }
 
+async function exportPdfReport() {
+  if (typeof html2canvas === 'undefined' || !window.jspdf?.jsPDF) {
+    toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
+    return;
+  }
+  const target = document.querySelector('main');
+  if (!target) {
+    toast('Nothing to export', 'warning');
+    return;
+  }
+  const btn = el.exportPdf;
+  const originalLabel = btn?.textContent;
+  try {
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = 'Exporting...';
+    }
+    const canvas = await html2canvas(target, { scale: 2, useCORS: true });
+    const imgData = canvas.toDataURL('image/png');
+    const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
+    const pageWidth = 210;
+    const pageHeight = 297;
+    const imgProps = pdf.getImageProperties(imgData);
+    const pdfWidth = pageWidth - 20;
+    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+    let position = 10;
+    let heightLeft = pdfHeight;
+    pdf.addImage(imgData, 'PNG', 10, position, pdfWidth, pdfHeight);
+    heightLeft -= pageHeight;
+    while (heightLeft > -pageHeight) {
+      pdf.addPage();
+      position = heightLeft + 10;
+      pdf.addImage(imgData, 'PNG', 10, position, pdfWidth, pdfHeight);
+      heightLeft -= pageHeight;
+    }
+    pdf.save('kse-crm-workbook.pdf');
+    toast('PDF exported', 'success');
+  } catch (err) {
+    console.error('PDF export failed', err);
+    toast('PDF export failed', 'warning');
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = originalLabel || 'Export PDF';
+    }
+  }
+}
+
 async function handleActivitySubmit(event) {
   event.preventDefault();
   const accountId = el.activityAccount.value || state.selectedAccountId;
@@ -1666,13 +1794,20 @@ async function buildActivityPayload(accountId) {
   const userId = state.session?.user?.id || 'local';
   const userName = state.session?.user?.name || state.session?.user?.email || 'CRM User';
   const contact = state.contacts.find((c) => c.id === el.activityContact.value);
+  let contactId = el.activityContact.value || null;
+  let contactName = (el.activityContactName?.value || '').trim() || contact?.name || '';
+  if (!contactId && contactName) {
+    const created = await ensureInlineContact(contactName, accountId);
+    contactId = created?.id || contactId;
+    contactName = created?.name || contactName;
+  }
   return {
     id: uuid(),
     userId,
     userName,
     accountId,
-    contactId: el.activityContact.value || null,
-    contactName: (el.activityContactName?.value || '').trim() || contact?.name || '',
+    contactId,
+    contactName,
     type: el.activityType.value,
     channel: el.activityChannel.value,
     subject: el.activitySubject.value || '',
@@ -1814,11 +1949,25 @@ async function handleOpportunitySubmit(event) {
     userId,
     accountId: account.id,
     description: el.opportunityDescription.value || 'New opportunity',
+    notes: el.opportunityNotes?.value || '',
     value: Number(el.opportunityValue.value || 0),
     status: el.opportunityStatus.value || 'open',
     createdAt: now,
     updatedAt: now
   };
+  const contactNameInput = (el.opportunityContactName?.value || '').trim();
+  const selectedContact = state.contacts.find((c) => c.id === el.opportunityContact?.value);
+  if (selectedContact) {
+    base.contactId = selectedContact.id;
+    base.contactName = selectedContact.name || '';
+  } else if (contactNameInput) {
+    const created = await ensureInlineContact(contactNameInput, account.id);
+    base.contactId = created?.id || null;
+    base.contactName = created?.name || contactNameInput;
+  } else {
+    base.contactId = null;
+    base.contactName = '';
+  }
   if (type === 'project') {
     const stageKey = el.projectStage?.value || '1';
     base.type = 'project';
@@ -1859,7 +2008,20 @@ async function handleOpportunityFieldChange(event) {
   const opp = state.opportunities.find((o) => o.id === id);
   if (!opp || opp.type === 'project') return;
   if (field === 'value') opp.value = Number(event.target.value || 0);
-  else opp[field] = event.target.value;
+  else if (field === 'contactId') {
+    opp.contactId = event.target.value || null;
+    const contact = state.contacts.find((c) => c.id === opp.contactId);
+    opp.contactName = contact?.name || opp.contactName || '';
+  } else if (field === 'contactName') {
+    opp.contactName = event.target.value;
+    if (!opp.contactId && opp.contactName) {
+      const created = await ensureInlineContact(opp.contactName, opp.accountId);
+      opp.contactId = created?.id || opp.contactId;
+      opp.contactName = created?.name || opp.contactName;
+    }
+  } else {
+    opp[field] = event.target.value;
+  }
   opp.updatedAt = new Date().toISOString();
   opp.userId = opp.userId || state.session?.user?.id || 'local';
   await db.opportunities.put(opp);
@@ -1868,7 +2030,7 @@ async function handleOpportunityFieldChange(event) {
   renderOpportunitiesSection(getSelectedAccount());
 }
 
-function handleProjectOpportunityChange(event) {
+async function handleProjectOpportunityChange(event) {
   const input = event.target.dataset.projectInput;
   const id = event.target.dataset.opportunityId;
   if (!input || !id) return;
@@ -1893,6 +2055,24 @@ function handleProjectOpportunityChange(event) {
     case 'gcList':
       opp.gcList = parseGcList(value);
       persistOpportunityChange(opp, 'opportunity', 'GC list updated');
+      break;
+    case 'notes':
+      opp.notes = value;
+      persistOpportunityChange(opp, 'opportunity', 'Project notes updated', false);
+      break;
+    case 'contactId':
+      opp.contactId = value || null;
+      opp.contactName = state.contacts.find((c) => c.id === opp.contactId)?.name || opp.contactName || '';
+      persistOpportunityChange(opp, 'opportunity', 'Project contact updated', false);
+      break;
+    case 'contactName':
+      opp.contactName = value;
+      if (!opp.contactId && value) {
+        const created = await ensureInlineContact(value, opp.accountId);
+        opp.contactId = created?.id || opp.contactId;
+        opp.contactName = created?.name || value;
+      }
+      persistOpportunityChange(opp, 'opportunity', 'Project contact updated', false);
       break;
     default:
       break;

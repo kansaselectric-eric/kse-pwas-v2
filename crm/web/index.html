@@ -7,6 +7,8 @@
   <meta name="theme-color" content="#0ea5e9">
   <link rel="manifest" href="manifest.json">
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
   <script>
     tailwind.config = {
       theme: {
@@ -252,7 +254,8 @@
             <button id="exportOpportunities" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Opportunities CSV</button>
             <button id="exportActivities" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Activities CSV</button>
             <button id="exportWeekly" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Weekly Summary CSV</button>
-            <button id="exportAll" class="rounded-xl btn-kse px-3 py-2 font-semibold col-span-2">Export All</button>
+            <button id="exportAll" class="rounded-xl btn-kse px-3 py-2 font-semibold col-span-1">Export All CSV</button>
+            <button id="exportPdf" class="rounded-xl border border-slate-200 px-3 py-2 font-semibold col-span-1 hover:bg-slate-50">Export PDF</button>
           </div>
         </section>
       </aside>
@@ -464,6 +467,20 @@
                     <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Description</label>
                     <input id="opportunityDescription" type="text" class="w-full panel-input" placeholder="Rebalance service contract">
                   </div>
+                </div>
+                <div class="grid gap-3 md:grid-cols-2">
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Primary contact</label>
+                    <select id="opportunityContact" class="w-full panel-input"></select>
+                  </div>
+                  <div>
+                    <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Contact name (freeform)</label>
+                    <input id="opportunityContactName" type="text" class="w-full panel-input" placeholder="Add or override contact name">
+                  </div>
+                </div>
+                <div>
+                  <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Additional notes</label>
+                  <textarea id="opportunityNotes" rows="3" class="w-full panel-input" placeholder="Key details, risks, partners..."></textarea>
                 </div>
                 <div class="grid gap-3 md:grid-cols-2">
                   <div>

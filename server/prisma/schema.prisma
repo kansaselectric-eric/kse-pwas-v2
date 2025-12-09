@@ -89,8 +89,11 @@ model Opportunity {
   id                      String  @id
   userId                  String?
   accountId               String?
+  contactId               String?
+  contactName             String?
   type                    String?
   description             String?
+  notes                   String?
   value                   Float?
   status                  String?
   stage                   String?
