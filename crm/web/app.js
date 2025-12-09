@@ -158,6 +158,7 @@ const el = {
   activityForm: document.getElementById('activityForm'),
   activityAccount: document.getElementById('activityAccount'),
   activityContact: document.getElementById('activityContact'),
+  activityContactName: document.getElementById('activityContactName'),
   activityType: document.getElementById('activityType'),
   activityChannel: document.getElementById('activityChannel'),
   activitySubject: document.getElementById('activitySubject'),
@@ -708,6 +709,12 @@ function ensureAppEventListeners() {
   });
   if (el.activityForm) el.activityForm.addEventListener('submit', handleActivitySubmit);
   if (el.activityAccount) el.activityAccount.addEventListener('change', (e) => populateActivityContacts(e.target.value));
+  if (el.activityContact) {
+    el.activityContact.addEventListener('change', () => {
+      const contact = state.contacts.find((c) => c.id === el.activityContact.value);
+      if (el.activityContactName) el.activityContactName.value = contact?.name || '';
+    });
+  }
   if (el.activitySentiment && el.sentimentValue) {
     el.activitySentiment.addEventListener('input', () => {
       el.sentimentValue.textContent = `(${el.activitySentiment.value})`;
@@ -880,6 +887,11 @@ function populateActivityContacts(accountId) {
   const options = state.contacts.filter((c) => !accountId || c.accountId === accountId);
   const opts = ['<option value="">No contact</option>', ...options.map((c) => `<option value="${c.id}">${escapeHtml(c.name)} — ${escapeHtml(c.role || '')}</option>`)];
   el.activityContact.innerHTML = opts.join('');
+  // Default the contact name input to the selected contact, if any.
+  if (el.activityContactName) {
+    const selected = state.contacts.find((c) => c.id === el.activityContact.value);
+    el.activityContactName.value = selected?.name || '';
+  }
 }
 
 function selectDefaultAccount() {
@@ -1101,6 +1113,8 @@ function renderActivityList(account) {
           <span class="text-xs text-slate-400">${formatDateString(act.date)} via ${escapeHtml(act.channel || '')}</span>
         </div>
         <p class="text-xs text-slate-400">Logged by ${escapeHtml(act.userName || 'Unknown')}</p>
+        <p class="text-xs text-slate-400">Contact ${escapeHtml(act.contactName || '') || '—'}</p>
+        <p class="text-xs text-slate-400">Next follow-up ${formatDateString(act.nextFollowUp)}</p>
         <p class="text-sm">${escapeHtml(act.subject || 'No subject')}</p>
         <p class="text-xs text-slate-400 whitespace-pre-wrap">${escapeHtml(act.notes || '')}</p>
         <div class="mt-2 flex flex-wrap gap-1 text-[11px] text-slate-300">
@@ -1651,12 +1665,14 @@ async function buildActivityPayload(accountId) {
   }
   const userId = state.session?.user?.id || 'local';
   const userName = state.session?.user?.name || state.session?.user?.email || 'CRM User';
+  const contact = state.contacts.find((c) => c.id === el.activityContact.value);
   return {
     id: uuid(),
     userId,
     userName,
     accountId,
     contactId: el.activityContact.value || null,
+    contactName: (el.activityContactName?.value || '').trim() || contact?.name || '',
     type: el.activityType.value,
     channel: el.activityChannel.value,
     subject: el.activitySubject.value || '',

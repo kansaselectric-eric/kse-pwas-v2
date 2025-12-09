@@ -140,6 +140,7 @@ const ACTIVITY_FIELDS = [
   'userName',
   'accountId',
   'contactId',
+  'contactName',
   'type',
   'channel',
   'subject',
