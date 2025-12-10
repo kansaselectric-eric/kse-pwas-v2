@@ -1,4 +1,4 @@
-const CACHE_NAME = 'kse-crm-cache-v3';
+const CACHE_NAME = 'kse-crm-cache-v4';
 const SHELL_ASSETS = [
   './',
   './index.html',
