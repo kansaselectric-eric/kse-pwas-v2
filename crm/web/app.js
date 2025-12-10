@@ -1485,6 +1485,10 @@ function renderAccountOpportunities(opps) {
             <input type="text" data-opportunity-id="${opp.id}" data-field="contactName" value="${escapeHtml(opp.contactName || '')}" class="panel-input" placeholder="Add or override contact name">
           </label>
         </div>
+        <div class="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3">
+          <p class="font-semibold text-slate-600 mb-2">Recent activity</p>
+          ${renderOpportunityActivityList(opp.id)}
+        </div>
       </div>`
     )
     .join('');
@@ -1569,9 +1573,34 @@ function renderProjectOpportunities(account, projectOpps) {
           <p class="font-semibold text-slate-600 mb-1">Project notes</p>
           <textarea data-project-input="notes" data-opportunity-id="${opp.id}" class="panel-input w-full" rows="3" placeholder="Add risks, partner notes, decision updates...">${escapeHtml(opp.notes || '')}</textarea>
         </div>
+        <div class="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3">
+          <p class="font-semibold text-slate-600 mb-2">Recent activity</p>
+          ${renderOpportunityActivityList(opp.id)}
+        </div>
       </div>`;
     })
     .join('');
+}
+
+function renderOpportunityActivityList(opportunityId) {
+  const items = state.activities
+    .filter((a) => a.opportunityId === opportunityId)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+  if (!items.length) return '<p class="text-slate-400">No activity yet.</p>';
+  return `
+    <ul class="space-y-1">
+      ${items
+        .map(
+          (a) => `
+          <li class="flex justify-between gap-2">
+            <span class="flex-1 text-slate-600 truncate">${escapeHtml(a.subject || a.notes || 'Activity')}</span>
+            <span class="text-slate-400">${formatDateString(a.date)}</span>
+          </li>`
+        )
+        .join('')}
+    </ul>
+  `;
 }
 
 function normalizeRoleBucket(role = '') {
