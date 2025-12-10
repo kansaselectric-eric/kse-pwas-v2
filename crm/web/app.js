@@ -568,9 +568,9 @@ async function bootstrapAfterAuth() {
   refreshOwnerUi(getSelectedAccount());
   updateQueueStatus();
   setActiveTab('activityTab');
+  await flushQueue();
   await syncFromServer();
   refreshOwnerUi(getSelectedAccount());
-  await flushQueue();
 }
 
 async function clearAllStores() {
