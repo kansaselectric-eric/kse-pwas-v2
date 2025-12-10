@@ -431,18 +431,7 @@ function buildPdfTable(type, range) {
 
 async function exportPdfByType(type, range) {
   try {
-    // Lazy-load libs if they aren't present (handles SW/caching issues)
-    if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
-      const [jspdfModule, autoTableModule, html2canvasModule] = await Promise.all([
-        import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'),
-        import('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js'),
-        import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js')
-      ]);
-      window.jspdf = jspdfModule?.jsPDF ? { jsPDF: jspdfModule.jsPDF } : window.jspdf || {};
-      if (autoTableModule?.default) window.jspdf.autoTable = window.jspdf.autoTable || autoTableModule.default;
-      if (html2canvasModule?.default) window.html2canvas = window.html2canvas || html2canvasModule.default;
-    }
-
+    await ensurePdfLibs();
     if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
       toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
       return;
@@ -456,6 +445,36 @@ async function exportPdfByType(type, range) {
     console.error('PDF export failed', err);
     toast('PDF export failed', 'warning');
   }
+}
+
+function loadScriptOnce(src, globalCheck) {
+  return new Promise((resolve, reject) => {
+    if (globalCheck()) return resolve();
+    const existing = document.querySelector(`script[data-dynamic="${src}"]`);
+    if (existing) {
+      existing.addEventListener('load', () => resolve());
+      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
+      return;
+    }
+    const script = document.createElement('script');
+    script.src = src;
+    script.defer = true;
+    script.dataset.dynamic = src;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error(`Failed to load ${src}`));
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePdfLibs() {
+  // Try globals first (from preloaded script tags)
+  if (window.jspdf?.jsPDF && window.jspdf?.autoTable && typeof window.jspdf.jsPDF === 'function' && typeof window.html2canvas === 'function') {
+    return;
+  }
+  // Sequentially load to avoid dependency ordering issues
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', () => typeof window.html2canvas === 'function');
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', () => window.jspdf?.jsPDF);
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js', () => window.jspdf?.autoTable);
 }
 
 function resolveApiHost() {
