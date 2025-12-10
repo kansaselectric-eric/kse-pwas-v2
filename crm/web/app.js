@@ -429,15 +429,32 @@ function buildPdfTable(type, range) {
   return doc;
 }
 
-function exportPdfByType(type, range) {
-  if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
-    toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
-    return;
-  }
-  const doc = buildPdfTable(type, range);
-  if (doc) {
-    doc.save(`ecd-${type}-${Date.now()}.pdf`);
-    toast('PDF exported', 'success');
+async function exportPdfByType(type, range) {
+  try {
+    // Lazy-load libs if they aren't present (handles SW/caching issues)
+    if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
+      const [jspdfModule, autoTableModule, html2canvasModule] = await Promise.all([
+        import('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js'),
+        import('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js'),
+        import('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js')
+      ]);
+      window.jspdf = jspdfModule?.jsPDF ? { jsPDF: jspdfModule.jsPDF } : window.jspdf || {};
+      if (autoTableModule?.default) window.jspdf.autoTable = window.jspdf.autoTable || autoTableModule.default;
+      if (html2canvasModule?.default) window.html2canvas = window.html2canvas || html2canvasModule.default;
+    }
+
+    if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
+      toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
+      return;
+    }
+    const doc = buildPdfTable(type, range);
+    if (doc) {
+      doc.save(`ecd-${type}-${Date.now()}.pdf`);
+      toast('PDF exported', 'success');
+    }
+  } catch (err) {
+    console.error('PDF export failed', err);
+    toast('PDF export failed', 'warning');
   }
 }
 
