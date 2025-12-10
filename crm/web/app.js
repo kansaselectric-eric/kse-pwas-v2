@@ -1361,18 +1361,18 @@ function renderActivityList(account) {
       (act) => `
       <li class="py-3">
         <div class="flex items-center justify-between text-sm">
-          <span class="font-semibold capitalize">${escapeHtml(act.type || '')}</span>
-          <span class="text-xs text-slate-400">${formatDateString(act.date)} via ${escapeHtml(act.channel || '')}</span>
+          <span class="font-semibold capitalize text-slate-800">${escapeHtml(act.type || '')}</span>
+          <span class="text-xs text-slate-500">${formatDateString(act.date)} via ${escapeHtml(act.channel || '')}</span>
         </div>
-        <p class="text-xs text-slate-400">Logged by ${escapeHtml(act.userName || 'Unknown')}</p>
-        <p class="text-xs text-slate-400">Contact ${escapeHtml(act.contactName || '') || '—'}</p>
-        <p class="text-xs text-slate-400">Opportunity ${escapeHtml(state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '') || '—'}</p>
-        <p class="text-xs text-slate-400">Next follow-up ${formatDateString(act.nextFollowUp)}</p>
-        <p class="text-sm">${escapeHtml(act.subject || 'No subject')}</p>
-        <p class="text-xs text-slate-400 whitespace-pre-wrap">${escapeHtml(act.notes || '')}</p>
-        <div class="mt-2 flex flex-wrap gap-1 text-[11px] text-slate-300">
-          ${(act.tags || []).map((tag) => `<span class="px-2 py-0.5 rounded-full bg-slate-800">${escapeHtml(tag)}</span>`).join('')}
-          ${act.aiConfidence != null ? `<span class="px-2 py-0.5 rounded-full bg-brand/20 text-brand">AI ${(act.aiConfidence * 100).toFixed(0)}%</span>` : ''}
+        <p class="text-xs text-slate-500">Logged by ${escapeHtml(act.userName || 'Unknown')}</p>
+        <p class="text-xs text-slate-500">Contact ${escapeHtml(act.contactName || '') || '—'}</p>
+        <p class="text-xs text-slate-500">Opportunity ${escapeHtml(state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '') || '—'}</p>
+        <p class="text-xs text-slate-500">Next follow-up ${formatDateString(act.nextFollowUp)}</p>
+        <p class="text-sm text-slate-700">${escapeHtml(act.subject || 'No subject')}</p>
+        <p class="text-xs text-slate-600 whitespace-pre-wrap">${escapeHtml(act.notes || '')}</p>
+        <div class="mt-2 flex flex-wrap gap-1 text-[11px]">
+          ${(act.tags || []).map((tag) => `<span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600">${escapeHtml(tag)}</span>`).join('')}
+          ${act.aiConfidence != null ? `<span class="px-2 py-0.5 rounded-full bg-blue-50 text-blue-600">AI ${(act.aiConfidence * 100).toFixed(0)}%</span>` : ''}
         </div>
       </li>`
     )
