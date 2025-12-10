@@ -8,6 +8,7 @@
 
 const DEV_HOSTNAMES = new Set(['localhost', '127.0.0.1']);
 const AUTH_DISABLED = resolveAuthDisabled();
+const PROD_API_HOST = 'https://kse-tools-server.up.railway.app';
 const API_HOST = resolveApiHost();
 const API_BASE = `${API_HOST}/api`;
 const AUTH_ROUTES = {
@@ -490,7 +491,10 @@ function resolveApiHost() {
   const stored = localStorage.getItem('kse_crm_api_host');
   if (stored) return stored;
   if (DEV_HOSTNAMES.has(window.location.hostname)) return 'http://localhost:4000';
-  return window.location.origin;
+  // If the current origin is an old/non-resolving server hostname, fall back to the known production API host.
+  const origin = normalized(window.location.origin);
+  if (origin.includes('kse-tools-server-production.up.railway.app')) return PROD_API_HOST;
+  return origin || PROD_API_HOST;
 }
 
 function getGlobalApiHost() {
