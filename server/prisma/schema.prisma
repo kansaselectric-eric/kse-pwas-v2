@@ -57,6 +57,7 @@ model Activity {
   accountId      String?
   contactId      String?
   contactName    String?
+  opportunityId  String?
   type           String?
   channel        String?
   subject        String?

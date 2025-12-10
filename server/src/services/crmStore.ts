@@ -141,6 +141,7 @@ const ACTIVITY_FIELDS = [
   'accountId',
   'contactId',
   'contactName',
+  'opportunityId',
   'type',
   'channel',
   'subject',

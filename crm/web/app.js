@@ -159,6 +159,7 @@ const el = {
   activityForm: document.getElementById('activityForm'),
   activityAccount: document.getElementById('activityAccount'),
   activityContact: document.getElementById('activityContact'),
+  activityOpportunity: document.getElementById('activityOpportunity'),
   activityContactName: document.getElementById('activityContactName'),
   activityType: document.getElementById('activityType'),
   activityChannel: document.getElementById('activityChannel'),
@@ -856,7 +857,10 @@ function ensureAppEventListeners() {
     btn.addEventListener('click', () => setActiveTab(btn.dataset.tab));
   });
   if (el.activityForm) el.activityForm.addEventListener('submit', handleActivitySubmit);
-  if (el.activityAccount) el.activityAccount.addEventListener('change', (e) => populateActivityContacts(e.target.value));
+  if (el.activityAccount) el.activityAccount.addEventListener('change', (e) => {
+    populateActivityContacts(e.target.value);
+    populateActivityOpportunities(e.target.value);
+  });
   if (el.activityContact) {
     el.activityContact.addEventListener('change', () => {
       const contact = state.contacts.find((c) => c.id === el.activityContact.value);
@@ -1031,6 +1035,7 @@ function populateAccountSelects() {
     .join('');
   if (state.selectedAccountId) el.activityAccount.value = state.selectedAccountId;
   populateActivityContacts(el.activityAccount.value);
+  populateActivityOpportunities(el.activityAccount.value);
   populateOpportunityContacts(el.activityAccount.value);
 }
 
@@ -1056,6 +1061,13 @@ function populateOpportunityContacts(accountId) {
     const selected = state.contacts.find((c) => c.id === el.opportunityContact.value);
     el.opportunityContactName.value = selected?.name || '';
   }
+}
+
+function populateActivityOpportunities(accountId) {
+  if (!el.activityOpportunity) return;
+  const options = state.opportunities.filter((o) => !accountId || o.accountId === accountId);
+  const opts = ['<option value="">No opportunity</option>', ...options.map((o) => `<option value="${o.id}">${escapeHtml(o.projectName || o.description || 'Opportunity')}</option>`)];
+  el.activityOpportunity.innerHTML = opts.join('');
 }
 
 async function ensureInlineContact(contactName, accountId) {
@@ -1100,6 +1112,7 @@ function selectAccount(accountId) {
   state.selectedAccountId = accountId;
   if (el.activityAccount) el.activityAccount.value = accountId || '';
   populateActivityContacts(accountId);
+  populateActivityOpportunities(accountId);
   renderSelectedAccount(getSelectedAccount());
   renderAccountList();
 }
@@ -1306,6 +1319,7 @@ function renderActivityList(account) {
         </div>
         <p class="text-xs text-slate-400">Logged by ${escapeHtml(act.userName || 'Unknown')}</p>
         <p class="text-xs text-slate-400">Contact ${escapeHtml(act.contactName || '') || '—'}</p>
+        <p class="text-xs text-slate-400">Opportunity ${escapeHtml(state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '') || '—'}</p>
         <p class="text-xs text-slate-400">Next follow-up ${formatDateString(act.nextFollowUp)}</p>
         <p class="text-sm">${escapeHtml(act.subject || 'No subject')}</p>
         <p class="text-xs text-slate-400 whitespace-pre-wrap">${escapeHtml(act.notes || '')}</p>
@@ -1937,6 +1951,7 @@ async function buildActivityPayload(accountId) {
   const contact = state.contacts.find((c) => c.id === el.activityContact.value);
   let contactId = el.activityContact.value || null;
   let contactName = (el.activityContactName?.value || '').trim() || contact?.name || '';
+  const opportunityId = el.activityOpportunity?.value || null;
   if (!contactId && contactName) {
     const created = await ensureInlineContact(contactName, accountId);
     contactId = created?.id || contactId;
@@ -1949,6 +1964,7 @@ async function buildActivityPayload(accountId) {
     accountId,
     contactId,
     contactName,
+    opportunityId,
     type: el.activityType.value,
     channel: el.activityChannel.value,
     subject: el.activitySubject.value || '',
@@ -2544,10 +2560,11 @@ function exportOpportunitiesCsv(range) {
 }
 
 function exportActivitiesCsv(range) {
-  const headers = ['Date', 'Account', 'Contact', 'Type', 'Channel', 'Logged By', 'Subject', 'Notes', 'Tags', 'Outcome', 'Sentiment', 'Duration', 'AI Confidence'];
+  const headers = ['Date', 'Account', 'Opportunity', 'Contact', 'Type', 'Channel', 'Logged By', 'Subject', 'Notes', 'Tags', 'Outcome', 'Sentiment', 'Duration', 'AI Confidence'];
   const rows = filterActivitiesByRange(range).map((act) => [
     act.date || '',
     state.accounts.find((acc) => acc.id === act.accountId)?.name || '',
+    state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '',
     state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '',
     act.type || '',
     act.channel || '',
