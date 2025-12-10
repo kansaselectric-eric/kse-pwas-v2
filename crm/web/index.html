@@ -9,6 +9,7 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js" defer></script>
   <script>
     tailwind.config = {
       theme: {
@@ -247,15 +248,32 @@
         </section>
 
         <section class="glass-panel rounded-2xl p-5">
-          <h3 class="text-sm font-semibold mb-3 tracking-wide uppercase text-slate-400">ECD Workbook Exports</h3>
-          <div class="grid grid-cols-2 gap-2 text-sm">
-            <button id="exportPipeline" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Pipeline CSV</button>
-            <button id="exportMovement" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Movement CSV</button>
-            <button id="exportOpportunities" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Opportunities CSV</button>
-            <button id="exportActivities" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Activities CSV</button>
-            <button id="exportWeekly" class="rounded-xl border border-slate-200 px-3 py-2 hover:bg-slate-50">Weekly Summary CSV</button>
-            <button id="exportAll" class="rounded-xl btn-kse px-3 py-2 font-semibold col-span-1">Export All CSV</button>
-            <button id="exportPdf" class="rounded-xl border border-slate-200 px-3 py-2 font-semibold col-span-1 hover:bg-slate-50">Export PDF</button>
+          <h3 class="text-sm font-semibold mb-3 tracking-wide uppercase text-slate-400">ECD Exports</h3>
+          <div class="grid gap-2 text-sm">
+            <div class="grid md:grid-cols-2 gap-2">
+              <label class="flex flex-col gap-1 text-slate-500">Export type
+                <select id="exportType" class="panel-input">
+                  <option value="">Select export</option>
+                  <option value="pipeline">Pipeline (accounts)</option>
+                  <option value="movements">Movement log</option>
+                  <option value="opportunities">Opportunities</option>
+                  <option value="activities">Activities</option>
+                </select>
+              </label>
+              <div class="grid grid-cols-2 gap-2">
+                <label class="flex flex-col gap-1 text-slate-500">Start date
+                  <input type="date" id="exportStart" class="panel-input">
+                </label>
+                <label class="flex flex-col gap-1 text-slate-500">End date
+                  <input type="date" id="exportEnd" class="panel-input">
+                </label>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <button id="exportCsv" class="rounded-xl btn-kse px-3 py-2 font-semibold">Export CSV</button>
+              <button id="exportPdf" class="rounded-xl border border-slate-200 px-3 py-2 font-semibold hover:bg-slate-50">Export PDF</button>
+            </div>
+            <p class="text-xs text-slate-400">Select an export type and a date range (required) before exporting.</p>
           </div>
         </section>
       </aside>
@@ -666,37 +684,37 @@
   </div>
 
   <div id="aiDrawer" class="fixed inset-0 hidden z-50">
-    <div class="absolute inset-0 bg-black/70"></div>
-    <div class="relative h-full w-full max-w-3xl ml-auto bg-slate-900 border-l border-white/10 flex flex-col glass-panel">
-      <div class="p-6 border-b border-white/5 flex items-center justify-between">
+    <div class="absolute inset-0 bg-black/40"></div>
+    <div class="relative h-full w-full max-w-3xl ml-auto bg-white border-l border-slate-200 flex flex-col glass-panel text-[var(--kse-text)]">
+      <div class="p-6 border-b border-slate-200 flex items-center justify-between">
         <div>
           <p class="text-xs uppercase tracking-[0.4em] text-slate-500">AI Assist</p>
-          <h2 class="text-2xl font-semibold">Narrate & Auto-Log Interaction</h2>
-          <p class="text-sm text-slate-400">Record → Transcribe → Extract → Confirm</p>
+          <h2 class="text-2xl font-semibold text-[var(--kse-text)]">Narrate & Auto-Log Interaction</h2>
+          <p class="text-sm text-slate-500">Record → Transcribe → Extract → Confirm</p>
         </div>
-        <button id="closeAiAssist" class="text-slate-400 hover:text-white text-sm">Close</button>
+        <button id="closeAiAssist" class="text-slate-500 hover:text-slate-700 text-sm">Close</button>
       </div>
-      <div class="flex-1 overflow-y-auto p-6 space-y-4">
-        <div class="rounded-2xl border border-white/5 p-4 bg-slate-950/60">
-          <div class="flex items-center justify-between text-sm text-slate-400">
+      <div class="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50">
+        <div class="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm">
+          <div class="flex items-center justify-between text-sm text-slate-600">
             <span id="dictationStatus">Idle</span>
-            <span id="aiConfidenceBadge" class="text-xs px-3 py-1 rounded-full border border-slate-700">Confidence: —</span>
+            <span id="aiConfidenceBadge" class="text-xs px-3 py-1 rounded-full border border-slate-300 text-slate-700">Confidence: —</span>
           </div>
           <div class="grid grid-cols-2 gap-3 text-sm mt-3">
-            <button id="dictateRecord" class="rounded-xl bg-slate-800 px-3 py-2">Record</button>
-            <button id="dictateStop" class="rounded-xl bg-slate-800 px-3 py-2">Stop</button>
-            <button id="dictateTranscribe" class="rounded-xl bg-slate-800 px-3 py-2">Transcribe</button>
-            <button id="dictateExtract" class="rounded-xl bg-slate-800 px-3 py-2">Extract</button>
+            <button id="dictateRecord" class="rounded-xl btn-kse px-3 py-2 shadow-sm">Record</button>
+            <button id="dictateStop" class="rounded-xl border border-slate-200 px-3 py-2 text-[var(--kse-text)] hover:bg-slate-100">Stop</button>
+            <button id="dictateTranscribe" class="rounded-xl border border-slate-200 px-3 py-2 text-[var(--kse-text)] hover:bg-slate-100">Transcribe</button>
+            <button id="dictateExtract" class="rounded-xl border border-slate-200 px-3 py-2 text-[var(--kse-text)] hover:bg-slate-100">Extract</button>
           </div>
-          <textarea id="aiTranscript" rows="6" class="mt-4 w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm" placeholder="Transcript preview..."></textarea>
+          <textarea id="aiTranscript" rows="6" class="mt-4 w-full rounded-xl bg-slate-50 border border-slate-300 px-3 py-2 text-sm text-[var(--kse-text)]" placeholder="Transcript preview..."></textarea>
         </div>
-        <div class="rounded-2xl border border-white/5 p-4 bg-slate-950/60 space-y-3">
-          <h3 class="font-semibold">Structured Output</h3>
-          <div id="aiStructuredPreview" class="text-sm text-slate-300">Run extraction to see structured data.</div>
+        <div class="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm space-y-3">
+          <h3 class="font-semibold text-[var(--kse-text)]">Structured Output</h3>
+          <div id="aiStructuredPreview" class="text-sm text-slate-600">Run extraction to see structured data.</div>
           <div class="flex flex-wrap gap-2 text-sm">
-            <button id="dictateAutofill" class="rounded-xl bg-brand/20 text-brand px-4 py-2">Apply All</button>
-            <button id="dictateApplyNotes" class="rounded-xl border border-slate-700 px-4 py-2">Apply Notes Only</button>
-            <button id="dictateReject" class="rounded-xl border border-rose-500 text-rose-300 px-4 py-2">Reject AI Output</button>
+            <button id="dictateAutofill" class="rounded-xl btn-kse px-4 py-2 shadow-sm">Apply All</button>
+            <button id="dictateApplyNotes" class="rounded-xl border border-slate-200 px-4 py-2 text-[var(--kse-text)] hover:bg-slate-100">Apply Notes Only</button>
+            <button id="dictateReject" class="rounded-xl border border-rose-400 text-rose-600 px-4 py-2 hover:bg-rose-50">Reject AI Output</button>
           </div>
         </div>
       </div>

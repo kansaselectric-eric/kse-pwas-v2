@@ -218,6 +218,10 @@ const el = {
   exportWeekly: document.getElementById('exportWeekly'),
   exportAll: document.getElementById('exportAll'),
   exportPdf: document.getElementById('exportPdf'),
+  exportType: document.getElementById('exportType'),
+  exportStart: document.getElementById('exportStart'),
+  exportEnd: document.getElementById('exportEnd'),
+  exportCsv: document.getElementById('exportCsv'),
   selectedAccountName: document.getElementById('selectedAccountName'),
   selectedAccountMeta: document.getElementById('selectedAccountMeta'),
   selectedAccountHealth: document.getElementById('selectedAccountHealth'),
@@ -343,6 +347,98 @@ function resolveAuthDisabled() {
     return Boolean(window.__CRM_AUTH_DISABLED);
   }
   return DEV_HOSTNAMES.has(window.location.hostname);
+}
+
+function buildPdfTable(type, range) {
+  const doc = new window.jspdf.jsPDF('p', 'mm', 'a4');
+  const title = `ECD ${type} export`;
+  doc.setFontSize(14);
+  doc.text(title, 10, 12);
+  doc.setFontSize(10);
+  const rangeText = `Range: ${el.exportStart.value} to ${el.exportEnd.value}`;
+  doc.text(rangeText, 10, 18);
+
+  const autotable = doc.autoTable;
+  const tableOpts = { startY: 24, headStyles: { fillColor: [0, 69, 140] }, styles: { fontSize: 9 } };
+
+  switch (type) {
+    case 'pipeline': {
+      const headers = [['Account', 'Stage', 'Score', 'City/State', 'Value', 'Owner', 'Updated']];
+      const rows = filterAccountsByRange(range).map((acc) => [
+        acc.name,
+        acc.stage || '',
+        acc.score ?? '',
+        `${acc.city || ''}${acc.city && acc.state ? ', ' : ''}${acc.state || ''}`,
+        formatCurrency(acc.projectedValue || acc.annualPotential || 0),
+        acc.ownerName || '',
+        formatDateString(acc.updatedAt)
+      ]);
+      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      break;
+    }
+    case 'movements': {
+      const headers = [['Date', 'Account', 'Context', 'Type', 'Old', 'New', 'By']];
+      const rows = filterMovementsByRange(range).map((m) => [
+        formatDateString(m.date),
+        state.accounts.find((a) => a.id === m.accountId)?.name || '',
+        m.context || '',
+        m.movementType || '',
+        m.oldStage || '',
+        m.newStage || '',
+        m.userName || ''
+      ]);
+      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      break;
+    }
+    case 'opportunities': {
+      const headers = [['Type', 'Account', 'Desc/Project', 'Value', 'Stage/Bid', 'Status', 'Updated']];
+      const rows = filterOpportunitiesByRange(range).map((opp) => {
+        const accountName = state.accounts.find((acc) => acc.id === opp.accountId)?.name || '';
+        const stage = opp.type === 'project' ? getProjectStageLabel(opp.ecdStageKey) : opp.stage || '';
+        const bid = opp.type === 'project' ? getBidStatusLabel(opp.bidStatus) : '';
+        return [
+          opp.type || 'account',
+          accountName,
+          opp.type === 'project' ? (opp.projectName || opp.description || '') : (opp.description || ''),
+          formatCurrency(opp.value || 0),
+          opp.type === 'project' ? `${stage} / ${bid}` : stage,
+          opp.status || '',
+          formatDateString(opp.updatedAt)
+        ];
+      });
+      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      break;
+    }
+    case 'activities': {
+      const headers = [['Date', 'Account', 'Contact', 'Type', 'Channel', 'Subject']];
+      const rows = filterActivitiesByRange(range).map((act) => [
+        formatDateString(act.date),
+        state.accounts.find((acc) => acc.id === act.accountId)?.name || '',
+        state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '',
+        act.type || '',
+        act.channel || '',
+        act.subject || ''
+      ]);
+      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      break;
+    }
+    default:
+      toast('Select an export type', 'warning');
+      return null;
+  }
+  return doc;
+}
+
+function exportPdfByType(type, range) {
+  if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable) {
+    toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
+    return;
+  }
+  const doc = buildPdfTable(type, range);
+  if (doc) {
+    doc.save(`ecd-${type}-${Date.now()}.pdf`);
+    toast('PDF exported', 'success');
+  }
 }
 
 function resolveApiHost() {
@@ -751,13 +847,9 @@ function ensureAppEventListeners() {
   if (el.generateWeeklyBtn) el.generateWeeklyBtn.addEventListener('click', generateWeeklySummary);
   if (el.copyWeeklySummary) el.copyWeeklySummary.addEventListener('click', copyWeeklySummaryToClipboard);
   if (el.weeklySummaryCsvBtn) el.weeklySummaryCsvBtn.addEventListener('click', downloadWeeklySummaryCsv);
-  if (el.exportPipeline) el.exportPipeline.addEventListener('click', exportPipelineCsv);
-  if (el.exportMovement) el.exportMovement.addEventListener('click', exportMovementCsv);
-  if (el.exportOpportunities) el.exportOpportunities.addEventListener('click', exportOpportunitiesCsv);
-  if (el.exportActivities) el.exportActivities.addEventListener('click', exportActivitiesCsv);
-  if (el.exportWeekly) el.exportWeekly.addEventListener('click', downloadWeeklySummaryCsv);
-  if (el.exportAll) el.exportAll.addEventListener('click', exportAllWorkbooks);
-  if (el.exportPdf) el.exportPdf.addEventListener('click', exportPdfReport);
+  // Unified export controls (date range required)
+  if (el.exportCsv) el.exportCsv.addEventListener('click', () => handleExport('csv'));
+  if (el.exportPdf) el.exportPdf.addEventListener('click', () => handleExport('pdf'));
   if (el.dictateRecord) el.dictateRecord.addEventListener('click', startRecording);
   if (el.dictateStop) el.dictateStop.addEventListener('click', stopRecording);
   if (el.dictateTranscribe) el.dictateTranscribe.addEventListener('click', handleTranscriptionRequest);
@@ -1691,61 +1783,62 @@ async function bootstrapFromDb() {
   updateStalledAccounts();
 }
 
-function exportAllWorkbooks() {
-  exportPipelineCsv();
-  exportMovementCsv();
-  exportOpportunitiesCsv();
-  exportActivitiesCsv();
-  downloadWeeklySummaryCsv();
-  toast('Exported all workbook tabs', 'success');
+// Unified export helpers (date range required)
+function getExportRange() {
+  const start = el.exportStart?.value;
+  const end = el.exportEnd?.value;
+  if (!start || !end) {
+    toast('Select start and end dates before exporting', 'warning');
+    return null;
+  }
+  const startDate = new Date(start);
+  const endDate = new Date(end);
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+    toast('Invalid date range', 'warning');
+    return null;
+  }
+  if (startDate > endDate) {
+    toast('Start date must be before end date', 'warning');
+    return null;
+  }
+  return { startDate, endDate };
 }
 
-async function exportPdfReport() {
-  if (typeof html2canvas === 'undefined' || !window.jspdf?.jsPDF) {
-    toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
-    return;
+function withinRange(value, range) {
+  if (!value) return false;
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return false;
+  return d >= range.startDate && d <= range.endDate;
+}
+
+function handleExport(format) {
+  const type = el.exportType?.value;
+  const range = getExportRange();
+  if (!type || !range) return;
+  const btn = format === 'pdf' ? el.exportPdf : el.exportCsv;
+  const original = btn?.textContent;
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = format === 'pdf' ? 'Exporting PDF...' : 'Exporting CSV...';
   }
-  const target = document.querySelector('main');
-  if (!target) {
-    toast('Nothing to export', 'warning');
-    return;
-  }
-  const btn = el.exportPdf;
-  const originalLabel = btn?.textContent;
-  try {
-    if (btn) {
-      btn.disabled = true;
-      btn.textContent = 'Exporting...';
-    }
-    const canvas = await html2canvas(target, { scale: 2, useCORS: true });
-    const imgData = canvas.toDataURL('image/png');
-    const pdf = new window.jspdf.jsPDF('p', 'mm', 'a4');
-    const pageWidth = 210;
-    const pageHeight = 297;
-    const imgProps = pdf.getImageProperties(imgData);
-    const pdfWidth = pageWidth - 20;
-    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-    let position = 10;
-    let heightLeft = pdfHeight;
-    pdf.addImage(imgData, 'PNG', 10, position, pdfWidth, pdfHeight);
-    heightLeft -= pageHeight;
-    while (heightLeft > -pageHeight) {
-      pdf.addPage();
-      position = heightLeft + 10;
-      pdf.addImage(imgData, 'PNG', 10, position, pdfWidth, pdfHeight);
-      heightLeft -= pageHeight;
-    }
-    pdf.save('kse-crm-workbook.pdf');
-    toast('PDF exported', 'success');
-  } catch (err) {
-    console.error('PDF export failed', err);
-    toast('PDF export failed', 'warning');
-  } finally {
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = originalLabel || 'Export PDF';
-    }
-  }
+  Promise.resolve()
+    .then(() => {
+      if (format === 'csv') {
+        exportCsvByType(type, range);
+      } else {
+        return exportPdfByType(type, range);
+      }
+    })
+    .catch((err) => {
+      console.error('Export failed', err);
+      toast('Export failed', 'warning');
+    })
+    .finally(() => {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = original || (format === 'pdf' ? 'Export PDF' : 'Export CSV');
+      }
+    });
 }
 
 async function handleActivitySubmit(event) {
@@ -2282,7 +2375,23 @@ function downloadWeeklySummaryCsv() {
   downloadCsv('ecd-weekly-summary', headers, rows);
 }
 
-function exportPipelineCsv() {
+function filterAccountsByRange(range) {
+  return state.accounts.filter((acc) => withinRange(acc.updatedAt || acc.createdAt, range));
+}
+
+function filterMovementsByRange(range) {
+  return state.movements.filter((move) => withinRange(move.date, range));
+}
+
+function filterOpportunitiesByRange(range) {
+  return state.opportunities.filter((opp) => withinRange(opp.updatedAt || opp.createdAt, range));
+}
+
+function filterActivitiesByRange(range) {
+  return state.activities.filter((act) => withinRange(act.date, range));
+}
+
+function exportPipelineCsv(range) {
   const headers = [
     'Account Name',
     'Industry',
@@ -2302,7 +2411,7 @@ function exportPipelineCsv() {
     'Last Updated By',
     'Last Updated'
   ];
-  const rows = state.accounts.map((acc) => [
+  const rows = filterAccountsByRange(range).map((acc) => [
     acc.name,
     acc.industry || '',
     acc.stage || '',
@@ -2324,9 +2433,9 @@ function exportPipelineCsv() {
   downloadCsv('ecd-enterprise-pipeline', headers, rows);
 }
 
-function exportMovementCsv() {
+function exportMovementCsv(range) {
   const headers = ['Account', 'Opportunity / Context', 'Movement Type', 'Old Stage', 'New Stage', 'Date', 'Notes', 'Updated By'];
-  const rows = state.movements.map((move) => [
+  const rows = filterMovementsByRange(range).map((move) => [
     state.accounts.find((acc) => acc.id === move.accountId)?.name || '',
     move.context || '',
     move.movementType || 'accountStage',
@@ -2339,7 +2448,7 @@ function exportMovementCsv() {
   downloadCsv('ecd-movement-log', headers, rows);
 }
 
-function exportOpportunitiesCsv() {
+function exportOpportunitiesCsv(range) {
   const headers = [
     'Opportunity Type',
     'Account',
@@ -2360,7 +2469,7 @@ function exportOpportunitiesCsv() {
     'Created',
     'Updated'
   ];
-  const rows = state.opportunities.map((opp) => {
+  const rows = filterOpportunitiesByRange(range).map((opp) => {
     const accountName = state.accounts.find((acc) => acc.id === opp.accountId)?.name || '';
     return [
       opp.type || 'account',
@@ -2386,12 +2495,12 @@ function exportOpportunitiesCsv() {
   downloadCsv('ecd-opportunity-tracking', headers, rows);
 }
 
-function exportActivitiesCsv() {
+function exportActivitiesCsv(range) {
   const headers = ['Date', 'Account', 'Contact', 'Type', 'Channel', 'Logged By', 'Subject', 'Notes', 'Tags', 'Outcome', 'Sentiment', 'Duration', 'AI Confidence'];
-  const rows = state.activities.map((act) => [
+  const rows = filterActivitiesByRange(range).map((act) => [
     act.date || '',
     state.accounts.find((acc) => acc.id === act.accountId)?.name || '',
-    state.contacts.find((c) => c.id === act.contactId)?.name || '',
+    state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '',
     act.type || '',
     act.channel || '',
     act.userName || '',
@@ -2417,6 +2526,26 @@ function downloadCsv(filename, headers, rows) {
   document.body.appendChild(link);
   link.click();
   link.remove();
+}
+
+function exportCsvByType(type, range) {
+  switch (type) {
+    case 'pipeline':
+      exportPipelineCsv(range);
+      break;
+    case 'movements':
+      exportMovementCsv(range);
+      break;
+    case 'opportunities':
+      exportOpportunitiesCsv(range);
+      break;
+    case 'activities':
+      exportActivitiesCsv(range);
+      break;
+    default:
+      toast('Select an export type', 'warning');
+      break;
+  }
 }
 
 async function startRecording() {
