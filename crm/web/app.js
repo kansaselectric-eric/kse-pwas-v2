@@ -352,100 +352,118 @@ function resolveAuthDisabled() {
   return DEV_HOSTNAMES.has(window.location.hostname);
 }
 
-function buildPrintableReport(type, range) {
-  const typeLabels = { pipeline: 'Enterprise Pipeline', movements: 'Movement Log', opportunities: 'Opportunity Tracking', activities: 'Activity Log' };
-  const title = typeLabels[type] || 'ECD Export';
-  const rangeText = `${el.exportStart?.value || ''} to ${el.exportEnd?.value || ''}`;
-  const now = new Date().toLocaleString();
-
-  let tableHtml = '';
-  switch (type) {
+function buildReportSection(sectionType, range) {
+  switch (sectionType) {
     case 'pipeline': {
       const rows = filterAccountsByRange(range);
       const totalValue = rows.reduce((sum, acc) => sum + (Number(acc.projectedValue) || Number(acc.annualPotential) || 0), 0);
-      tableHtml = `
-        <div class="summary-row"><span>${rows.length} accounts</span><span>Total Value: ${formatCurrency(totalValue)}</span></div>
-        <table>
-          <thead><tr><th>Account</th><th>Industry</th><th>Stage</th><th>Score</th><th>Location</th><th class="num">Value</th><th>Owner</th><th>Updated</th></tr></thead>
-          <tbody>${rows.map((acc) => `<tr>
-            <td class="primary">${escapeHtml(acc.name)}</td>
-            <td>${escapeHtml(acc.industry || '')}</td>
-            <td><span class="badge">${escapeHtml(acc.stage || '')}</span></td>
-            <td class="num">${acc.score ?? ''}</td>
-            <td>${escapeHtml(acc.city || '')}${acc.city && acc.state ? ', ' : ''}${escapeHtml(acc.state || '')}</td>
-            <td class="num">${formatCurrency(acc.projectedValue || acc.annualPotential || 0)}</td>
-            <td>${escapeHtml(acc.ownerName || '')}</td>
-            <td class="date">${formatDateString(acc.updatedAt)}</td>
-          </tr>`).join('')}</tbody>
-        </table>`;
-      break;
-    }
-    case 'movements': {
-      const rows = filterMovementsByRange(range);
-      tableHtml = `
-        <div class="summary-row"><span>${rows.length} movements</span></div>
-        <table>
-          <thead><tr><th>Date</th><th>Account</th><th>Context</th><th>Type</th><th>From</th><th>To</th><th>By</th></tr></thead>
-          <tbody>${rows.map((m) => `<tr>
-            <td class="date">${formatDateString(m.date)}</td>
-            <td class="primary">${escapeHtml(state.accounts.find((a) => a.id === m.accountId)?.name || '')}</td>
-            <td>${escapeHtml(m.context || '')}</td>
-            <td>${escapeHtml(m.movementType || '')}</td>
-            <td><span class="badge muted">${escapeHtml(m.oldStage || '')}</span></td>
-            <td><span class="badge">${escapeHtml(m.newStage || '')}</span></td>
-            <td>${escapeHtml(m.userName || '')}</td>
-          </tr>`).join('')}</tbody>
-        </table>`;
-      break;
+      return `
+        <div class="section">
+          <h2>Enterprise Pipeline</h2>
+          <div class="summary-row"><span>${rows.length} accounts</span><span>Total Value: ${formatCurrency(totalValue)}</span></div>
+          <table>
+            <thead><tr><th>Account</th><th>Industry</th><th>Stage</th><th>Score</th><th>Location</th><th class="num">Value</th><th>Owner</th><th>Updated</th></tr></thead>
+            <tbody>${rows.map((acc) => `<tr>
+              <td class="primary">${escapeHtml(acc.name)}</td>
+              <td>${escapeHtml(acc.industry || '')}</td>
+              <td><span class="badge">${escapeHtml(acc.stage || '')}</span></td>
+              <td class="num">${acc.score ?? ''}</td>
+              <td>${escapeHtml(acc.city || '')}${acc.city && acc.state ? ', ' : ''}${escapeHtml(acc.state || '')}</td>
+              <td class="num">${formatCurrency(acc.projectedValue || acc.annualPotential || 0)}</td>
+              <td>${escapeHtml(acc.ownerName || '')}</td>
+              <td class="date">${formatDateString(acc.updatedAt)}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>`;
     }
     case 'opportunities': {
       const rows = filterOpportunitiesByRange(range);
       const totalValue = rows.reduce((sum, opp) => sum + (Number(opp.value) || 0), 0);
-      tableHtml = `
-        <div class="summary-row"><span>${rows.length} opportunities</span><span>Total Value: ${formatCurrency(totalValue)}</span></div>
-        <table>
-          <thead><tr><th>Type</th><th>Account</th><th>Project / Description</th><th class="num">Value</th><th>Stage</th><th>Bid Status</th><th>Status</th><th>Due</th><th>Estimator</th><th>Updated</th></tr></thead>
-          <tbody>${rows.map((opp) => {
-            const accountName = state.accounts.find((acc) => acc.id === opp.accountId)?.name || '';
-            const stage = opp.type === 'project' ? getProjectStageLabel(opp.ecdStageKey) : opp.stage || '';
-            const bid = opp.type === 'project' ? getBidStatusLabel(opp.bidStatus) : '';
-            return `<tr>
-              <td><span class="badge ${opp.type === 'project' ? 'project' : 'account'}">${opp.type || 'account'}</span></td>
-              <td class="primary">${escapeHtml(accountName)}</td>
-              <td>${escapeHtml(opp.type === 'project' ? (opp.projectName || opp.description || '') : (opp.description || ''))}</td>
-              <td class="num">${formatCurrency(opp.value || 0)}</td>
-              <td><span class="badge">${escapeHtml(stage)}</span></td>
-              <td>${escapeHtml(bid)}</td>
-              <td><span class="badge ${opp.status === 'won' ? 'won' : opp.status === 'lost' ? 'lost' : ''}">${escapeHtml(opp.status || '')}</span></td>
-              <td class="date">${opp.type === 'project' ? formatDateString(opp.bidDueDate) : ''}</td>
-              <td>${escapeHtml(opp.type === 'project' ? opp.assignedEstimator || '' : '')}</td>
-              <td class="date">${formatDateString(opp.updatedAt)}</td>
-            </tr>`;
-          }).join('')}</tbody>
-        </table>`;
-      break;
+      return `
+        <div class="section">
+          <h2>Opportunity Tracking</h2>
+          <div class="summary-row"><span>${rows.length} opportunities</span><span>Total Value: ${formatCurrency(totalValue)}</span></div>
+          <table>
+            <thead><tr><th>Type</th><th>Account</th><th>Project / Description</th><th class="num">Value</th><th>Stage</th><th>Bid Status</th><th>Status</th><th>Due</th><th>Estimator</th><th>Updated</th></tr></thead>
+            <tbody>${rows.map((opp) => {
+              const accountName = state.accounts.find((acc) => acc.id === opp.accountId)?.name || '';
+              const stage = opp.type === 'project' ? getProjectStageLabel(opp.ecdStageKey) : opp.stage || '';
+              const bid = opp.type === 'project' ? getBidStatusLabel(opp.bidStatus) : '';
+              return `<tr>
+                <td><span class="badge ${opp.type === 'project' ? 'project' : 'account'}">${opp.type || 'account'}</span></td>
+                <td class="primary">${escapeHtml(accountName)}</td>
+                <td>${escapeHtml(opp.type === 'project' ? (opp.projectName || opp.description || '') : (opp.description || ''))}</td>
+                <td class="num">${formatCurrency(opp.value || 0)}</td>
+                <td><span class="badge">${escapeHtml(stage)}</span></td>
+                <td>${escapeHtml(bid)}</td>
+                <td><span class="badge ${opp.status === 'won' ? 'won' : opp.status === 'lost' ? 'lost' : ''}">${escapeHtml(opp.status || '')}</span></td>
+                <td class="date">${opp.type === 'project' ? formatDateString(opp.bidDueDate) : ''}</td>
+                <td>${escapeHtml(opp.type === 'project' ? opp.assignedEstimator || '' : '')}</td>
+                <td class="date">${formatDateString(opp.updatedAt)}</td>
+              </tr>`;
+            }).join('')}</tbody>
+          </table>
+        </div>`;
+    }
+    case 'movements': {
+      const rows = filterMovementsByRange(range);
+      return `
+        <div class="section">
+          <h2>Movement Log</h2>
+          <div class="summary-row"><span>${rows.length} movements</span></div>
+          <table>
+            <thead><tr><th>Date</th><th>Account</th><th>Context</th><th>Type</th><th>From</th><th>To</th><th>By</th></tr></thead>
+            <tbody>${rows.map((m) => `<tr>
+              <td class="date">${formatDateString(m.date)}</td>
+              <td class="primary">${escapeHtml(state.accounts.find((a) => a.id === m.accountId)?.name || '')}</td>
+              <td>${escapeHtml(m.context || '')}</td>
+              <td>${escapeHtml(m.movementType || '')}</td>
+              <td><span class="badge muted">${escapeHtml(m.oldStage || '')}</span></td>
+              <td><span class="badge">${escapeHtml(m.newStage || '')}</span></td>
+              <td>${escapeHtml(m.userName || '')}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>`;
     }
     case 'activities': {
       const rows = filterActivitiesByRange(range);
-      tableHtml = `
-        <div class="summary-row"><span>${rows.length} activities</span></div>
-        <table>
-          <thead><tr><th>Date</th><th>Account</th><th>Opportunity</th><th>Contact</th><th>Type</th><th>Channel</th><th>Subject</th><th>By</th></tr></thead>
-          <tbody>${rows.map((act) => `<tr>
-            <td class="date">${formatDateString(act.date)}</td>
-            <td class="primary">${escapeHtml(state.accounts.find((acc) => acc.id === act.accountId)?.name || '')}</td>
-            <td>${escapeHtml(state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '')}</td>
-            <td>${escapeHtml(state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '')}</td>
-            <td>${escapeHtml(act.type || '')}</td>
-            <td>${escapeHtml(act.channel || '')}</td>
-            <td>${escapeHtml(act.subject || '')}</td>
-            <td>${escapeHtml(act.userName || '')}</td>
-          </tr>`).join('')}</tbody>
-        </table>`;
-      break;
+      return `
+        <div class="section">
+          <h2>Activity Log</h2>
+          <div class="summary-row"><span>${rows.length} activities</span></div>
+          <table>
+            <thead><tr><th>Date</th><th>Account</th><th>Opportunity</th><th>Contact</th><th>Type</th><th>Channel</th><th>Subject</th><th>By</th></tr></thead>
+            <tbody>${rows.map((act) => `<tr>
+              <td class="date">${formatDateString(act.date)}</td>
+              <td class="primary">${escapeHtml(state.accounts.find((acc) => acc.id === act.accountId)?.name || '')}</td>
+              <td>${escapeHtml(state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '')}</td>
+              <td>${escapeHtml(state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '')}</td>
+              <td>${escapeHtml(act.type || '')}</td>
+              <td>${escapeHtml(act.channel || '')}</td>
+              <td>${escapeHtml(act.subject || '')}</td>
+              <td>${escapeHtml(act.userName || '')}</td>
+            </tr>`).join('')}</tbody>
+          </table>
+        </div>`;
     }
     default:
-      return null;
+      return '';
+  }
+}
+
+function buildPrintableReport(type, range) {
+  const typeLabels = { pipeline: 'Enterprise Pipeline', movements: 'Movement Log', opportunities: 'Opportunity Tracking', activities: 'Activity Log', all: 'Full ECD Report' };
+  const title = typeLabels[type] || 'ECD Export';
+  const rangeText = `${el.exportStart?.value || ''} to ${el.exportEnd?.value || ''}`;
+  const now = new Date().toLocaleString();
+
+  let contentHtml = '';
+  if (type === 'all') {
+    contentHtml = ['pipeline', 'opportunities', 'movements', 'activities'].map((t) => buildReportSection(t, range)).join('');
+  } else {
+    const sectionHtml = buildReportSection(type, range);
+    if (!sectionHtml) return null;
+    contentHtml = sectionHtml;
   }
 
   return `<!DOCTYPE html>
@@ -456,11 +474,13 @@ function buildPrintableReport(type, range) {
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 11px; color: #1e293b; padding: 24px; background: #fff; }
-    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #00458c; padding-bottom: 12px; margin-bottom: 16px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #00458c; padding-bottom: 12px; margin-bottom: 20px; }
     .header h1 { font-size: 22px; font-weight: 700; color: #00458c; }
     .header .meta { text-align: right; font-size: 10px; color: #64748b; }
+    .section { margin-bottom: 32px; page-break-inside: avoid; }
+    .section h2 { font-size: 16px; font-weight: 700; color: #00458c; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 12px; }
     .summary-row { display: flex; justify-content: space-between; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-weight: 600; color: #334155; }
-    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 8px; }
     thead { background: #00458c; color: #fff; }
     th { padding: 10px 8px; text-align: left; font-weight: 600; white-space: nowrap; }
     th.num { text-align: right; }
@@ -469,7 +489,6 @@ function buildPrintableReport(type, range) {
     td.date { white-space: nowrap; color: #64748b; }
     td.primary { font-weight: 600; color: #0f172a; }
     tr:nth-child(even) { background: #f8fafc; }
-    tr:hover { background: #f1f5f9; }
     .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; background: #e0f2fe; color: #0369a1; }
     .badge.muted { background: #f1f5f9; color: #64748b; }
     .badge.project { background: #dbeafe; color: #1d4ed8; }
@@ -479,6 +498,8 @@ function buildPrintableReport(type, range) {
     @media print {
       body { padding: 0; }
       .header { page-break-after: avoid; }
+      .section { page-break-before: auto; }
+      .section h2 { page-break-after: avoid; }
       tr { page-break-inside: avoid; }
     }
   </style>
@@ -491,7 +512,7 @@ function buildPrintableReport(type, range) {
       <div>Generated: ${escapeHtml(now)}</div>
     </div>
   </div>
-  ${tableHtml}
+  ${contentHtml}
   <script>window.onload = () => { window.print(); };<\/script>
 </body>
 </html>`;
@@ -2727,6 +2748,12 @@ function downloadCsv(filename, headers, rows) {
 
 function exportCsvByType(type, range) {
   switch (type) {
+    case 'all':
+      exportPipelineCsv(range);
+      exportOpportunitiesCsv(range);
+      exportMovementCsv(range);
+      exportActivitiesCsv(range);
+      break;
     case 'pipeline':
       exportPipelineCsv(range);
       break;
