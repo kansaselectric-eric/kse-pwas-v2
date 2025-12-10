@@ -430,7 +430,7 @@ function buildPdfTable(type, range) {
 }
 
 function exportPdfByType(type, range) {
-  if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable) {
+  if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
     toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
     return;
   }
