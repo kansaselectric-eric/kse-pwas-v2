@@ -352,140 +352,165 @@ function resolveAuthDisabled() {
   return DEV_HOSTNAMES.has(window.location.hostname);
 }
 
-function buildPdfTable(type, range) {
-  const doc = new window.jspdf.jsPDF('p', 'mm', 'a4');
-  const title = `ECD ${type} export`;
-  doc.setFontSize(14);
-  doc.text(title, 10, 12);
-  doc.setFontSize(10);
-  const rangeText = `Range: ${el.exportStart.value} to ${el.exportEnd.value}`;
-  doc.text(rangeText, 10, 18);
+function buildPrintableReport(type, range) {
+  const typeLabels = { pipeline: 'Enterprise Pipeline', movements: 'Movement Log', opportunities: 'Opportunity Tracking', activities: 'Activity Log' };
+  const title = typeLabels[type] || 'ECD Export';
+  const rangeText = `${el.exportStart?.value || ''} to ${el.exportEnd?.value || ''}`;
+  const now = new Date().toLocaleString();
 
-  const autotable = doc.autoTable || window.jspdfAutoTable;
-  const tableOpts = { startY: 24, headStyles: { fillColor: [0, 69, 140] }, styles: { fontSize: 9 } };
-
+  let tableHtml = '';
   switch (type) {
     case 'pipeline': {
-      const headers = [['Account', 'Stage', 'Score', 'City/State', 'Value', 'Owner', 'Updated']];
-      const rows = filterAccountsByRange(range).map((acc) => [
-        acc.name,
-        acc.stage || '',
-        acc.score ?? '',
-        `${acc.city || ''}${acc.city && acc.state ? ', ' : ''}${acc.state || ''}`,
-        formatCurrency(acc.projectedValue || acc.annualPotential || 0),
-        acc.ownerName || '',
-        formatDateString(acc.updatedAt)
-      ]);
-      if (!autotable) throw new Error('autoTable missing');
-      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      const rows = filterAccountsByRange(range);
+      const totalValue = rows.reduce((sum, acc) => sum + (Number(acc.projectedValue) || Number(acc.annualPotential) || 0), 0);
+      tableHtml = `
+        <div class="summary-row"><span>${rows.length} accounts</span><span>Total Value: ${formatCurrency(totalValue)}</span></div>
+        <table>
+          <thead><tr><th>Account</th><th>Industry</th><th>Stage</th><th>Score</th><th>Location</th><th class="num">Value</th><th>Owner</th><th>Updated</th></tr></thead>
+          <tbody>${rows.map((acc) => `<tr>
+            <td class="primary">${escapeHtml(acc.name)}</td>
+            <td>${escapeHtml(acc.industry || '')}</td>
+            <td><span class="badge">${escapeHtml(acc.stage || '')}</span></td>
+            <td class="num">${acc.score ?? ''}</td>
+            <td>${escapeHtml(acc.city || '')}${acc.city && acc.state ? ', ' : ''}${escapeHtml(acc.state || '')}</td>
+            <td class="num">${formatCurrency(acc.projectedValue || acc.annualPotential || 0)}</td>
+            <td>${escapeHtml(acc.ownerName || '')}</td>
+            <td class="date">${formatDateString(acc.updatedAt)}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
       break;
     }
     case 'movements': {
-      const headers = [['Date', 'Account', 'Context', 'Type', 'Old', 'New', 'By']];
-      const rows = filterMovementsByRange(range).map((m) => [
-        formatDateString(m.date),
-        state.accounts.find((a) => a.id === m.accountId)?.name || '',
-        m.context || '',
-        m.movementType || '',
-        m.oldStage || '',
-        m.newStage || '',
-        m.userName || ''
-      ]);
-      if (!autotable) throw new Error('autoTable missing');
-      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      const rows = filterMovementsByRange(range);
+      tableHtml = `
+        <div class="summary-row"><span>${rows.length} movements</span></div>
+        <table>
+          <thead><tr><th>Date</th><th>Account</th><th>Context</th><th>Type</th><th>From</th><th>To</th><th>By</th></tr></thead>
+          <tbody>${rows.map((m) => `<tr>
+            <td class="date">${formatDateString(m.date)}</td>
+            <td class="primary">${escapeHtml(state.accounts.find((a) => a.id === m.accountId)?.name || '')}</td>
+            <td>${escapeHtml(m.context || '')}</td>
+            <td>${escapeHtml(m.movementType || '')}</td>
+            <td><span class="badge muted">${escapeHtml(m.oldStage || '')}</span></td>
+            <td><span class="badge">${escapeHtml(m.newStage || '')}</span></td>
+            <td>${escapeHtml(m.userName || '')}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
       break;
     }
     case 'opportunities': {
-      const headers = [['Type', 'Account', 'Desc/Project', 'Value', 'Stage/Bid', 'Status', 'Updated']];
-      const rows = filterOpportunitiesByRange(range).map((opp) => {
-        const accountName = state.accounts.find((acc) => acc.id === opp.accountId)?.name || '';
-        const stage = opp.type === 'project' ? getProjectStageLabel(opp.ecdStageKey) : opp.stage || '';
-        const bid = opp.type === 'project' ? getBidStatusLabel(opp.bidStatus) : '';
-        return [
-          opp.type || 'account',
-          accountName,
-          opp.type === 'project' ? (opp.projectName || opp.description || '') : (opp.description || ''),
-          formatCurrency(opp.value || 0),
-          opp.type === 'project' ? `${stage} / ${bid}` : stage,
-          opp.status || '',
-          formatDateString(opp.updatedAt)
-        ];
-      });
-      if (!autotable) throw new Error('autoTable missing');
-      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      const rows = filterOpportunitiesByRange(range);
+      const totalValue = rows.reduce((sum, opp) => sum + (Number(opp.value) || 0), 0);
+      tableHtml = `
+        <div class="summary-row"><span>${rows.length} opportunities</span><span>Total Value: ${formatCurrency(totalValue)}</span></div>
+        <table>
+          <thead><tr><th>Type</th><th>Account</th><th>Project / Description</th><th class="num">Value</th><th>Stage</th><th>Bid Status</th><th>Status</th><th>Due</th><th>Estimator</th><th>Updated</th></tr></thead>
+          <tbody>${rows.map((opp) => {
+            const accountName = state.accounts.find((acc) => acc.id === opp.accountId)?.name || '';
+            const stage = opp.type === 'project' ? getProjectStageLabel(opp.ecdStageKey) : opp.stage || '';
+            const bid = opp.type === 'project' ? getBidStatusLabel(opp.bidStatus) : '';
+            return `<tr>
+              <td><span class="badge ${opp.type === 'project' ? 'project' : 'account'}">${opp.type || 'account'}</span></td>
+              <td class="primary">${escapeHtml(accountName)}</td>
+              <td>${escapeHtml(opp.type === 'project' ? (opp.projectName || opp.description || '') : (opp.description || ''))}</td>
+              <td class="num">${formatCurrency(opp.value || 0)}</td>
+              <td><span class="badge">${escapeHtml(stage)}</span></td>
+              <td>${escapeHtml(bid)}</td>
+              <td><span class="badge ${opp.status === 'won' ? 'won' : opp.status === 'lost' ? 'lost' : ''}">${escapeHtml(opp.status || '')}</span></td>
+              <td class="date">${opp.type === 'project' ? formatDateString(opp.bidDueDate) : ''}</td>
+              <td>${escapeHtml(opp.type === 'project' ? opp.assignedEstimator || '' : '')}</td>
+              <td class="date">${formatDateString(opp.updatedAt)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>`;
       break;
     }
     case 'activities': {
-      const headers = [['Date', 'Account', 'Contact', 'Type', 'Channel', 'Subject']];
-      const rows = filterActivitiesByRange(range).map((act) => [
-        formatDateString(act.date),
-        state.accounts.find((acc) => acc.id === act.accountId)?.name || '',
-        state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '',
-        act.type || '',
-        act.channel || '',
-        act.subject || ''
-      ]);
-      if (!autotable) throw new Error('autoTable missing');
-      autotable.call(doc, { head: headers, body: rows, ...tableOpts });
+      const rows = filterActivitiesByRange(range);
+      tableHtml = `
+        <div class="summary-row"><span>${rows.length} activities</span></div>
+        <table>
+          <thead><tr><th>Date</th><th>Account</th><th>Opportunity</th><th>Contact</th><th>Type</th><th>Channel</th><th>Subject</th><th>By</th></tr></thead>
+          <tbody>${rows.map((act) => `<tr>
+            <td class="date">${formatDateString(act.date)}</td>
+            <td class="primary">${escapeHtml(state.accounts.find((acc) => acc.id === act.accountId)?.name || '')}</td>
+            <td>${escapeHtml(state.opportunities.find((o) => o.id === act.opportunityId)?.projectName || state.opportunities.find((o) => o.id === act.opportunityId)?.description || '')}</td>
+            <td>${escapeHtml(state.contacts.find((c) => c.id === act.contactId)?.name || act.contactName || '')}</td>
+            <td>${escapeHtml(act.type || '')}</td>
+            <td>${escapeHtml(act.channel || '')}</td>
+            <td>${escapeHtml(act.subject || '')}</td>
+            <td>${escapeHtml(act.userName || '')}</td>
+          </tr>`).join('')}</tbody>
+        </table>`;
       break;
     }
     default:
-      toast('Select an export type', 'warning');
       return null;
   }
-  return doc;
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; font-size: 11px; color: #1e293b; padding: 24px; background: #fff; }
+    .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #00458c; padding-bottom: 12px; margin-bottom: 16px; }
+    .header h1 { font-size: 22px; font-weight: 700; color: #00458c; }
+    .header .meta { text-align: right; font-size: 10px; color: #64748b; }
+    .summary-row { display: flex; justify-content: space-between; background: #f1f5f9; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-weight: 600; color: #334155; }
+    table { width: 100%; border-collapse: collapse; font-size: 10px; }
+    thead { background: #00458c; color: #fff; }
+    th { padding: 10px 8px; text-align: left; font-weight: 600; white-space: nowrap; }
+    th.num { text-align: right; }
+    td { padding: 8px; border-bottom: 1px solid #e2e8f0; vertical-align: top; }
+    td.num { text-align: right; font-variant-numeric: tabular-nums; }
+    td.date { white-space: nowrap; color: #64748b; }
+    td.primary { font-weight: 600; color: #0f172a; }
+    tr:nth-child(even) { background: #f8fafc; }
+    tr:hover { background: #f1f5f9; }
+    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 600; background: #e0f2fe; color: #0369a1; }
+    .badge.muted { background: #f1f5f9; color: #64748b; }
+    .badge.project { background: #dbeafe; color: #1d4ed8; }
+    .badge.account { background: #f0fdf4; color: #15803d; }
+    .badge.won { background: #dcfce7; color: #166534; }
+    .badge.lost { background: #fee2e2; color: #b91c1c; }
+    @media print {
+      body { padding: 0; }
+      .header { page-break-after: avoid; }
+      tr { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>${escapeHtml(title)}</h1>
+    <div class="meta">
+      <div>Range: ${escapeHtml(rangeText)}</div>
+      <div>Generated: ${escapeHtml(now)}</div>
+    </div>
+  </div>
+  ${tableHtml}
+  <script>window.onload = () => { window.print(); };<\/script>
+</body>
+</html>`;
 }
 
 async function exportPdfByType(type, range) {
-  try {
-    await ensurePdfLibs();
-    if (!window.jspdf?.jsPDF || !window.jspdf?.autoTable || typeof window.jspdf?.jsPDF !== 'function') {
-      toast('PDF libs not loaded yet. Please wait a moment and retry.', 'warning');
-      return;
-    }
-    const doc = buildPdfTable(type, range);
-    if (doc) {
-      doc.save(`ecd-${type}-${Date.now()}.pdf`);
-      toast('PDF exported', 'success');
-    }
-  } catch (err) {
-    console.error('PDF export failed', err);
-    toast('PDF export failed', 'warning');
-  }
-}
-
-function loadScriptOnce(src, globalCheck) {
-  return new Promise((resolve, reject) => {
-    if (globalCheck()) return resolve();
-    const existing = document.querySelector(`script[data-dynamic="${src}"]`);
-    if (existing) {
-      existing.addEventListener('load', () => resolve());
-      existing.addEventListener('error', () => reject(new Error(`Failed to load ${src}`)));
-      return;
-    }
-    const script = document.createElement('script');
-    script.src = src;
-    script.defer = true;
-    script.dataset.dynamic = src;
-    script.onload = () => resolve();
-    script.onerror = () => reject(new Error(`Failed to load ${src}`));
-    document.head.appendChild(script);
-  });
-}
-
-async function ensurePdfLibs() {
-  // Try globals first (from preloaded script tags)
-  if (window.jspdf?.jsPDF && typeof window.jspdf.jsPDF === 'function' && (window.jspdf?.autoTable || window.jspdfAutoTable)) {
+  const html = buildPrintableReport(type, range);
+  if (!html) {
+    toast('Select an export type', 'warning');
     return;
   }
-  // Sequentially load to avoid dependency ordering issues
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', () => window.jspdf?.jsPDF);
-  // Attempt to load autotable; plugin should attach to window.jspdf.autoTable; also keep a backup on window.jspdfAutoTable
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js', () => window.jspdf?.autoTable || window.jspdfAutoTable);
-  // Ensure window.jspdf exists
-  if (!window.jspdf && window.jspdfAutoTable) {
-    window.jspdf = { autoTable: window.jspdfAutoTable };
+  const printWindow = window.open('', '_blank', 'width=900,height=700');
+  if (!printWindow) {
+    toast('Popup blocked – allow popups and try again', 'warning');
+    return;
   }
+  printWindow.document.write(html);
+  printWindow.document.close();
+  toast('Print dialog opened – save as PDF', 'info');
 }
 
 function resolveApiHost() {
