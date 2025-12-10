@@ -92,6 +92,7 @@ const PROJECT_BID_STATUSES = [
 ];
 const PROJECT_STAGE_MAP = Object.fromEntries(PROJECT_ECD_STAGES.map((stage) => [stage.key, stage]));
 const PROJECT_BID_STATUS_MAP = Object.fromEntries(PROJECT_BID_STATUSES.map((status) => [status.value, status]));
+const NOTES_V1_PREFIX = '[[v1-notes]]';
 
 const state = {
   session: null,
@@ -1569,9 +1570,17 @@ function renderProjectOpportunities(account, projectOpps) {
           <p class="font-semibold text-slate-600">Project address</p>
           <p>${escapeHtml(opp.projectAddress || 'Add address or GPS note')}</p>
         </div>
-        <div class="text-xs text-slate-500">
-          <p class="font-semibold text-slate-600 mb-1">Project notes</p>
-          <textarea data-project-input="notes" data-opportunity-id="${opp.id}" class="panel-input w-full" rows="3" placeholder="Add risks, partner notes, decision updates...">${escapeHtml(opp.notes || '')}</textarea>
+        <div class="text-xs text-slate-500 space-y-2">
+          <p class="font-semibold text-slate-600">Add update</p>
+          <textarea data-project-note-input="${opp.id}" class="panel-input w-full" rows="2" placeholder="Append a quick update without overwriting history"></textarea>
+          <div class="flex items-center gap-2">
+            <button type="button" class="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50" data-opportunity-id="${opp.id}" data-project-action="appendNote">Add update</button>
+            <span class="text-[11px] text-slate-400">Appends with timestamp; previous updates stay visible.</span>
+          </div>
+        </div>
+        <div class="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3">
+          <p class="font-semibold text-slate-600 mb-2">Project updates</p>
+          <div data-project-notes="${opp.id}" class="space-y-2">${renderProjectNotes(opp)}</div>
         </div>
         <div class="text-xs text-slate-500 bg-slate-50 border border-slate-100 rounded-xl p-3">
           <p class="font-semibold text-slate-600 mb-2">Recent activity</p>
@@ -1756,6 +1765,63 @@ function hydrateOpportunity(opp = {}) {
     hydrated.stage = hydrated.stage || 'lead';
   }
   return hydrated;
+}
+
+function parseProjectNotes(raw) {
+  if (!raw) return [];
+  if (typeof raw !== 'string') return [];
+  if (raw.startsWith(NOTES_V1_PREFIX)) {
+    try {
+      const parsed = JSON.parse(raw.slice(NOTES_V1_PREFIX.length));
+      if (Array.isArray(parsed)) return parsed;
+    } catch {
+      // fall through to legacy handling
+    }
+  }
+  const legacy = raw.trim();
+  if (!legacy) return [];
+  return [{ date: null, author: 'Previous note', text: legacy }];
+}
+
+function serializeProjectNotes(entries = []) {
+  // keep most recent 50 notes to avoid unbounded growth
+  const limited = entries.slice(0, 50);
+  return `${NOTES_V1_PREFIX}${JSON.stringify(limited)}`;
+}
+
+function appendProjectNote(opportunity, text) {
+  const trimmed = (text || '').trim();
+  if (!trimmed) return false;
+  const user = getCurrentUserMeta();
+  const existing = parseProjectNotes(opportunity.notes);
+  existing.unshift({
+    date: new Date().toISOString(),
+    author: user.name,
+    text: trimmed
+  });
+  opportunity.notes = serializeProjectNotes(existing);
+  return true;
+}
+
+function renderProjectNotes(opportunity) {
+  const entries = parseProjectNotes(opportunity.notes);
+  if (!entries.length) return '<p class="text-slate-400">No updates yet.</p>';
+  return `
+    <ul class="space-y-2">
+      ${entries
+        .map(
+          (entry) => `
+          <li class="rounded-lg border border-slate-100 bg-white/70 p-2">
+            <div class="flex items-center justify-between text-[11px] text-slate-400">
+              <span>${escapeHtml(entry.author || 'Update')}</span>
+              <span>${formatDateTime(entry.date) || ''}</span>
+            </div>
+            <p class="text-[13px] text-slate-700 whitespace-pre-wrap">${escapeHtml(entry.text || '')}</p>
+          </li>`
+        )
+        .join('')}
+    </ul>
+  `;
 }
 
 function formatCurrency(value) {
@@ -2265,12 +2331,24 @@ async function handleProjectOpportunityChange(event) {
   }
 }
 
-function handleProjectOpportunityClick(event) {
+async function handleProjectOpportunityClick(event) {
   const action = event.target.dataset.projectAction;
   const id = event.target.dataset.opportunityId;
   if (!action || !id) return;
   const opp = state.opportunities.find((o) => o.id === id);
   if (!opp || opp.type !== 'project') return;
+  if (action === 'appendNote') {
+    const input = el.projectOpportunitiesList?.querySelector(`[data-project-note-input="${id}"]`);
+    const text = input?.value?.trim();
+    if (!text) {
+      toast('Add an update before saving.', 'warning');
+      return;
+    }
+    appendProjectNote(opp, text);
+    if (input) input.value = '';
+    await persistOpportunityChange(opp, 'opportunity', 'Project update added');
+    return;
+  }
   if (action === 'toggleBudgetary') {
     opp.budgetaryOnly = !opp.budgetaryOnly;
     persistOpportunityChange(opp, 'opportunity', opp.budgetaryOnly ? 'Marked as budgetary' : 'Marked as formal bid');
