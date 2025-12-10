@@ -359,7 +359,7 @@ function buildPdfTable(type, range) {
   const rangeText = `Range: ${el.exportStart.value} to ${el.exportEnd.value}`;
   doc.text(rangeText, 10, 18);
 
-  const autotable = doc.autoTable;
+  const autotable = doc.autoTable || window.jspdfAutoTable;
   const tableOpts = { startY: 24, headStyles: { fillColor: [0, 69, 140] }, styles: { fontSize: 9 } };
 
   switch (type) {
@@ -374,6 +374,7 @@ function buildPdfTable(type, range) {
         acc.ownerName || '',
         formatDateString(acc.updatedAt)
       ]);
+      if (!autotable) throw new Error('autoTable missing');
       autotable.call(doc, { head: headers, body: rows, ...tableOpts });
       break;
     }
@@ -388,6 +389,7 @@ function buildPdfTable(type, range) {
         m.newStage || '',
         m.userName || ''
       ]);
+      if (!autotable) throw new Error('autoTable missing');
       autotable.call(doc, { head: headers, body: rows, ...tableOpts });
       break;
     }
@@ -407,6 +409,7 @@ function buildPdfTable(type, range) {
           formatDateString(opp.updatedAt)
         ];
       });
+      if (!autotable) throw new Error('autoTable missing');
       autotable.call(doc, { head: headers, body: rows, ...tableOpts });
       break;
     }
@@ -420,6 +423,7 @@ function buildPdfTable(type, range) {
         act.channel || '',
         act.subject || ''
       ]);
+      if (!autotable) throw new Error('autoTable missing');
       autotable.call(doc, { head: headers, body: rows, ...tableOpts });
       break;
     }
@@ -469,13 +473,17 @@ function loadScriptOnce(src, globalCheck) {
 
 async function ensurePdfLibs() {
   // Try globals first (from preloaded script tags)
-  if (window.jspdf?.jsPDF && window.jspdf?.autoTable && typeof window.jspdf.jsPDF === 'function' && typeof window.html2canvas === 'function') {
+  if (window.jspdf?.jsPDF && typeof window.jspdf.jsPDF === 'function' && (window.jspdf?.autoTable || window.jspdfAutoTable)) {
     return;
   }
   // Sequentially load to avoid dependency ordering issues
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js', () => typeof window.html2canvas === 'function');
   await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js', () => window.jspdf?.jsPDF);
-  await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js', () => window.jspdf?.autoTable);
+  // Attempt to load autotable; plugin should attach to window.jspdf.autoTable; also keep a backup on window.jspdfAutoTable
+  await loadScriptOnce('https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.1/dist/jspdf.plugin.autotable.min.js', () => window.jspdf?.autoTable || window.jspdfAutoTable);
+  // Ensure window.jspdf exists
+  if (!window.jspdf && window.jspdfAutoTable) {
+    window.jspdf = { autoTable: window.jspdfAutoTable };
+  }
 }
 
 function resolveApiHost() {
