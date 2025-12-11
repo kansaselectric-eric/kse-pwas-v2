@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Request, type Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { config } from '../config.js';
@@ -17,7 +17,7 @@ export const aiRouter = Router();
 
 aiRouter.use(verifyAuthToken);
 
-aiRouter.post('/transcribe', upload.single('file'), async (req, res) => {
+aiRouter.post('/transcribe', upload.single('file') as any, async (req: Request, res: Response) => {
   try {
     if (!config.openAi.apiKey) {
       return res.status(500).json({ ok: false, error: 'OpenAI API key not configured' });
@@ -28,7 +28,7 @@ aiRouter.post('/transcribe', upload.single('file'), async (req, res) => {
     }
     const baseUrl = config.openAi.baseUrl.replace(/\/+$/, '');
     const form = new FormData();
-    form.append('file', new Blob([file.buffer], { type: file.mimetype || 'audio/webm' }), file.originalname || 'audio.webm');
+    form.append('file', new Blob([new Uint8Array(file.buffer)], { type: file.mimetype || 'audio/webm' }), file.originalname || 'audio.webm');
     form.append('model', 'whisper-1');
     form.append('response_format', 'json');
 
