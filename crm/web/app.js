@@ -19,6 +19,8 @@ const AUTH_ROUTES = {
 };
 
 const CRM_SYNC_ENDPOINT = `${API_BASE}/crm`;
+const AI_TRANSCRIBE_ENDPOINT = `${API_BASE}/transcribe`;
+const AI_EXTRACT_ENDPOINT = `${API_BASE}/extractBD`;
 
 const DB_NAME = 'kse-enterprise-crm';
 const DB_VERSION = 7;
@@ -2880,7 +2882,7 @@ async function transcribeAudio(blob) {
   formData.append('file', blob, 'interaction.webm');
   try {
     const headers = getAuthHeaders();
-    const res = await fetch('/api/transcribe', { method: 'POST', headers, body: formData });
+    const res = await fetch(AI_TRANSCRIBE_ENDPOINT, { method: 'POST', headers, body: formData });
     if (!res.ok) throw new Error(`Transcription failed ${res.status}`);
     const data = await res.json();
     return data.text || data.transcript || '';
@@ -2894,7 +2896,7 @@ async function transcribeAudio(blob) {
 }
 
 async function extractBDInsights(transcript) {
-  const res = await fetch('/api/extractBD', {
+  const res = await fetch(AI_EXTRACT_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify({ transcript })
