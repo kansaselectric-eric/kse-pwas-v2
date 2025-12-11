@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geo-Intel Customer & Prospect Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    :root { font-family: 'Inter', system-ui, -apple-system, sans-serif; }
+    body { margin: 0; background: #0f172a; color: #0f172a; }
+    .page { max-width: 1280px; margin: 0 auto; padding: 16px; }
+    header { color: #e2e8f0; display: flex; flex-wrap: wrap; gap: 12px; align-items: center; justify-content: space-between; }
+    .card { background: #ffffff; border-radius: 16px; padding: 12px; box-shadow: 0 10px 30px rgba(15,23,42,0.12); }
+    #map { width: 100%; height: 70vh; border-radius: 16px; }
+    .layout { display: grid; grid-template-columns: minmax(0,2fr) 360px; gap: 12px; }
+    @media (max-width: 960px) { .layout { grid-template-columns: 1fr; } #map { height: 60vh; } }
+    .pill { border: 1px solid #cbd5e1; border-radius: 999px; padding: 6px 10px; font-size: 12px; color: #0f172a; background: #f8fafc; }
+    .muted { color: #475569; font-size: 12px; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div>
+        <p class="muted" style="letter-spacing:0.2em;text-transform:uppercase;">Geo-Intel</p>
+        <h1 style="margin:4px 0 0;font-size:22px;">Customer & Prospect Map</h1>
+        <p class="muted">Toggle customers, prospects, drive radii, and drill into details.</p>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <a href="index.html" class="pill">Back to CRM</a>
+        <span id="mapStatus" class="pill muted">Idle</span>
+      </div>
+    </header>
+
+    <div class="layout" style="margin-top:12px;">
+      <div class="card" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+          <input id="mapSearchInput" type="search" placeholder="Search by name..." style="flex:1;min-width:200px;padding:8px 10px;border-radius:12px;border:1px solid #cbd5e1;">
+          <button id="mapRefreshBtn" class="pill">Refresh</button>
+          <button id="useGpsBtn" class="pill">Use my location</button>
+        </div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;">
+          <label class="pill"><input id="toggleCustomers" type="checkbox" checked> Customers</label>
+          <label class="pill"><input id="toggleProspects" type="checkbox" checked> Prospects</label>
+          <label class="pill"><input id="radius30" type="checkbox"> 30 min</label>
+          <label class="pill"><input id="radius60" type="checkbox"> 60 min</label>
+          <label class="pill"><input id="radius90" type="checkbox"> 90 min</label>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;">
+          <label class="muted">Status
+            <select id="statusFilter" style="width:100%;padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;">
+              <option value="">All</option>
+              <option value="Healthy">Healthy</option>
+              <option value="Stalled">Stalled</option>
+              <option value="At Risk">At Risk</option>
+            </select>
+          </label>
+          <label class="muted">Industry
+            <input id="industryFilter" type="text" placeholder="Utilities, Industrial..." style="width:100%;padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;">
+          </label>
+          <label class="muted">Revenue range
+            <select id="revenueFilter" style="width:100%;padding:8px 10px;border-radius:10px;border:1px solid #cbd5e1;">
+              <option value="">Any</option>
+              <option value="lt1">&lt; $1M</option>
+              <option value="1to5">$1M - $5M</option>
+              <option value="gt5">&gt; $5M</option>
+            </select>
+          </label>
+          <label class="muted">Distance from HQ
+            <div style="display:flex;align-items:center;gap:8px;">
+              <input id="distanceFilter" type="range" min="0" max="150" step="10" style="flex:1;">
+              <span id="distanceValue" class="muted">Off</span>
+            </div>
+          </label>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <aside class="card" id="detailSidebar">
+        <h3 style="margin:0 0 6px;font-size:18px;">Tap a pin to see details</h3>
+        <p class="muted">Customers are color-coded by health; prospects use blue pins. Use filters and search to refine the view.</p>
+      </aside>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="geo-intel.js" defer></script>
+</body>
+</html>

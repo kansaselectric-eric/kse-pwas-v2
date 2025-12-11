@@ -150,8 +150,9 @@
     <main class="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_360px]">
       <aside class="space-y-4 text-kse-blue-dark">
         <section class="glass-panel rounded-2xl p-5 text-kse-blue-dark">
-          <div class="flex items-center justify-between mb-3">
+          <div class="flex items-center justify-between mb-3 gap-2">
             <h2 class="text-lg font-semibold text-[var(--kse-text)]">New Enterprise Account</h2>
+            <button id="aiAssistAccountBtn" type="button" class="text-xs rounded-full px-3 py-1.5 border border-kse-orange text-kse-orange hover:bg-kse-orange/10">AI Assist</button>
           </div>
           <form id="newAccountForm" class="space-y-3 text-sm">
             <div>
@@ -227,6 +228,10 @@
             <button id="refreshBtn" class="text-xs px-3 py-1.5 rounded-full btn-kse shadow-lg">Sync</button>
           </div>
           <input id="accountSearch" type="search" placeholder="Search accounts..." class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/30">
+          <div class="flex gap-2 mt-2">
+            <button id="voiceLookupBtn" type="button" class="flex-1 rounded-xl border border-slate-700 py-2 text-xs text-slate-200 hover:bg-slate-800">Voice lookup</button>
+            <a href="geo-intel.html" class="flex-1 text-center rounded-xl border border-brand/50 text-brand py-2 text-xs hover:bg-brand/10">Geo-Intel Map</a>
+          </div>
           <label class="block text-xs uppercase tracking-wide text-slate-400 mt-3">Stage</label>
           <select id="filterStage" class="w-full rounded-xl bg-slate-950/80 border border-slate-800 px-3 py-2 text-sm focus:border-brand focus:ring-2 focus:ring-brand/30">
             <option value="">All stages</option>
@@ -478,6 +483,10 @@
               </section>
 
               <form id="opportunityForm" class="space-y-3 rounded-2xl border border-slate-100 p-5 bg-white shadow-sm">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-md font-semibold text-[var(--kse-text)]">New Opportunity</h4>
+                  <button id="aiAssistOpportunityBtn" type="button" class="text-xs rounded-full px-3 py-1.5 border border-kse-orange text-kse-orange hover:bg-kse-orange/10">AI Assist</button>
+                </div>
                 <div class="grid gap-3 md:grid-cols-2">
                   <div>
                     <label class="block text-xs uppercase tracking-wide text-slate-400 mb-1">Opportunity type</label>
@@ -613,8 +622,11 @@
 
       <aside class="space-y-4">
         <section class="glass-panel rounded-2xl p-5 text-kse-blue-dark">
-          <div class="flex items-center justify-between">
-            <h3 class="text-lg font-semibold">Account Summary</h3>
+          <div class="flex items-center justify-between gap-3 flex-wrap">
+            <div class="flex items-center gap-3">
+              <h3 class="text-lg font-semibold">Account Summary</h3>
+              <button id="prepBriefingBtn" type="button" class="text-xs rounded-full px-3 py-1.5 border border-brand text-brand hover:bg-brand/10">Prep Briefing</button>
+            </div>
             <span id="stalledBadge" class="text-xs px-3 py-1 rounded-full border border-slate-700 text-slate-400">Healthy</span>
           </div>
           <dl class="grid grid-cols-2 gap-3 mt-4 text-sm">
@@ -714,12 +726,77 @@
           <textarea id="aiTranscript" rows="6" class="mt-4 w-full rounded-xl bg-slate-50 border border-slate-300 px-3 py-2 text-sm text-[var(--kse-text)]" placeholder="Transcript preview..."></textarea>
         </div>
         <div class="rounded-2xl border border-slate-200 p-4 bg-white shadow-sm space-y-3">
-          <h3 class="font-semibold text-[var(--kse-text)]">Structured Output</h3>
+          <div class="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h3 class="font-semibold text-[var(--kse-text)]">Structured Output</h3>
+              <p id="aiExtractionStatus" class="text-xs text-slate-500">Run extraction to see structured data.</p>
+            </div>
+            <label class="text-xs text-slate-500 flex items-center gap-2">
+              Apply to
+              <select id="aiTargetSelect" class="panel-input text-sm">
+                <option value="activity">Activity card</option>
+                <option value="account">New account card</option>
+                <option value="opportunity">Opportunity card</option>
+                <option value="contact">Contact card</option>
+                <option value="lookup">Voice lookup</option>
+              </select>
+            </label>
+          </div>
           <div id="aiStructuredPreview" class="text-sm text-slate-600">Run extraction to see structured data.</div>
           <div class="flex flex-wrap gap-2 text-sm">
             <button id="dictateAutofill" class="rounded-xl btn-kse px-4 py-2 shadow-sm">Apply All</button>
             <button id="dictateApplyNotes" class="rounded-xl border border-slate-200 px-4 py-2 text-[var(--kse-text)] hover:bg-slate-100">Apply Notes Only</button>
             <button id="dictateReject" class="rounded-xl border border-rose-400 text-rose-600 px-4 py-2 hover:bg-rose-50">Reject AI Output</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="briefingModal" class="fixed inset-0 hidden z-50">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative h-full w-full max-w-4xl mx-auto my-6 bg-white rounded-2xl shadow-2xl flex flex-col glass-panel overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Customer Briefing</p>
+          <h2 id="briefingTitle" class="text-xl font-semibold text-[var(--kse-text)]">Loading...</h2>
+          <p class="text-xs text-slate-500">Internal + external intel with AI talking points.</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="copyBriefingBtn" class="text-xs rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-100">Copy</button>
+          <button id="closeBriefingBtn" class="text-xs rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-100">Close</button>
+        </div>
+      </div>
+      <div class="p-6 space-y-3 overflow-y-auto">
+        <div id="briefingStatus" class="text-sm text-slate-500">Preparing briefing...</div>
+        <div class="grid gap-4 lg:grid-cols-2" id="briefingContent" hidden>
+          <div class="space-y-3">
+            <div class="rounded-xl border border-slate-200 p-3 bg-slate-50">
+              <p class="text-xs uppercase text-slate-500">Overview</p>
+              <div id="briefingOverview" class="text-sm text-slate-700"></div>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Internal Intel</p>
+              <ul id="briefingInternal" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">External Signals</p>
+              <ul id="briefingExternal" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Talking Points</p>
+              <ul id="briefingTalkingPoints" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Risks & Next Steps</p>
+              <ul id="briefingNextSteps" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3 bg-slate-50">
+              <p class="text-xs uppercase text-slate-500">Follow-up Email Draft</p>
+              <pre id="briefingEmail" class="text-xs whitespace-pre-wrap text-slate-700"></pre>
+            </div>
           </div>
         </div>
       </div>

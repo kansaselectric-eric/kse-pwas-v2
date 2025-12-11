@@ -21,6 +21,8 @@ const AUTH_ROUTES = {
 const CRM_SYNC_ENDPOINT = `${API_BASE}/crm`;
 const AI_TRANSCRIBE_ENDPOINT = `${API_BASE}/transcribe`;
 const AI_EXTRACT_ENDPOINT = `${API_BASE}/extractBD`;
+const AI_BRIEFING_ENDPOINT = `${API_BASE}/briefing`;
+const EXTERNAL_INFO_ENDPOINT = `${API_BASE}/external-info`;
 
 const DB_NAME = 'kse-enterprise-crm';
 const DB_VERSION = 7;
@@ -112,7 +114,9 @@ const state = {
   dictation: { transcript: '', extraction: null },
   stalledAccountIds: new Set(),
   aiDrawerOpen: false,
+  aiTarget: 'activity',
   projectFilter: 'all',
+  briefing: { open: false, loading: false, data: null, error: null },
   knownUsers: [...DEMO_USERS]
 };
 
@@ -131,6 +135,8 @@ const el = {
   newAccountNextStep: document.getElementById('newAccountNextStep'),
   newAccountNotes: document.getElementById('newAccountNotes'),
   newAccountStatus: document.getElementById('newAccountStatus'),
+  aiAssistAccountBtn: document.getElementById('aiAssistAccountBtn'),
+  aiAssistOpportunityBtn: document.getElementById('aiAssistOpportunityBtn'),
   loginView: document.getElementById('loginView'),
   loginForm: document.getElementById('loginForm'),
   loginEmail: document.getElementById('loginEmail'),
@@ -144,6 +150,7 @@ const el = {
   lastSync: document.getElementById('lastSync'),
   queueStatus: document.getElementById('queueStatus'),
   accountSearch: document.getElementById('accountSearch'),
+  voiceLookupBtn: document.getElementById('voiceLookupBtn'),
   filterStage: document.getElementById('filterStage'),
   filterIndustry: document.getElementById('filterIndustry'),
   applyAccountFilters: document.getElementById('applyAccountFilters'),
@@ -251,6 +258,7 @@ const el = {
   aiDrawer: document.getElementById('aiDrawer'),
   openAiAssist: document.getElementById('openAiAssist'),
   closeAiAssist: document.getElementById('closeAiAssist'),
+  aiTargetSelect: document.getElementById('aiTargetSelect'),
   dictateRecord: document.getElementById('dictateRecord'),
   dictateStop: document.getElementById('dictateStop'),
   dictateTranscribe: document.getElementById('dictateTranscribe'),
@@ -263,6 +271,19 @@ const el = {
   aiExtractionStatus: document.getElementById('aiExtractionStatus'),
   aiStructuredPreview: document.getElementById('aiStructuredPreview'),
   aiConfidenceBadge: document.getElementById('aiConfidenceBadge'),
+  prepBriefingBtn: document.getElementById('prepBriefingBtn'),
+  briefingModal: document.getElementById('briefingModal'),
+  briefingTitle: document.getElementById('briefingTitle'),
+  briefingStatus: document.getElementById('briefingStatus'),
+  briefingContent: document.getElementById('briefingContent'),
+  briefingOverview: document.getElementById('briefingOverview'),
+  briefingInternal: document.getElementById('briefingInternal'),
+  briefingExternal: document.getElementById('briefingExternal'),
+  briefingTalkingPoints: document.getElementById('briefingTalkingPoints'),
+  briefingNextSteps: document.getElementById('briefingNextSteps'),
+  briefingEmail: document.getElementById('briefingEmail'),
+  closeBriefingBtn: document.getElementById('closeBriefingBtn'),
+  copyBriefingBtn: document.getElementById('copyBriefingBtn'),
   toastContainer: document.getElementById('toastContainer')
 };
 
@@ -564,6 +585,7 @@ function getGlobalApiHost() {
 function init() {
   attachGlobalListeners();
   updateAiConfidenceBadge(null);
+  setAiTarget(state.aiTarget);
 setNetworkStatus();
   if (AUTH_DISABLED) {
     const dummySession = {
@@ -609,10 +631,17 @@ function attachGlobalListeners() {
   if (el.newAccountForm) {
     el.newAccountForm.addEventListener('submit', handleNewAccountSubmit);
   }
-  if (el.openAiAssist) el.openAiAssist.addEventListener('click', openAiDrawer);
+  if (el.openAiAssist) el.openAiAssist.addEventListener('click', () => openAiDrawer('activity'));
+  if (el.aiAssistAccountBtn) el.aiAssistAccountBtn.addEventListener('click', () => openAiDrawer('account'));
+  if (el.aiAssistOpportunityBtn) el.aiAssistOpportunityBtn.addEventListener('click', () => openAiDrawer('opportunity'));
   if (el.closeAiAssist) el.closeAiAssist.addEventListener('click', closeAiDrawer);
+  if (el.aiTargetSelect) el.aiTargetSelect.addEventListener('change', (e) => setAiTarget(e.target.value));
   if (el.dictateApplyNotes) el.dictateApplyNotes.addEventListener('click', applyExtractionNotesOnly);
   if (el.dictateReject) el.dictateReject.addEventListener('click', rejectAiExtraction);
+  if (el.voiceLookupBtn) el.voiceLookupBtn.addEventListener('click', quickVoiceLookup);
+  if (el.prepBriefingBtn) el.prepBriefingBtn.addEventListener('click', openBriefingModal);
+  if (el.closeBriefingBtn) el.closeBriefingBtn.addEventListener('click', closeBriefingModal);
+  if (el.copyBriefingBtn) el.copyBriefingBtn.addEventListener('click', copyBriefingToClipboard);
 }
 
 function showLoginView(message = '') {
@@ -758,7 +787,7 @@ async function bootstrapAfterAuth() {
   await ensureCustomerSeedImported();
   populateAccountSelects();
   renderAccountList();
-  selectDefaultAccount();
+  if (!selectAccountFromUrl()) selectDefaultAccount();
   refreshOwnerUi(getSelectedAccount());
   updateQueueStatus();
   setActiveTab('activityTab');
@@ -955,7 +984,7 @@ function ensureAppEventListeners() {
   if (el.dictateStop) el.dictateStop.addEventListener('click', stopRecording);
   if (el.dictateTranscribe) el.dictateTranscribe.addEventListener('click', handleTranscriptionRequest);
   if (el.dictateExtract) el.dictateExtract.addEventListener('click', handleExtractionRequest);
-  if (el.dictateAutofill) el.dictateAutofill.addEventListener('click', applyExtractionToForm);
+  if (el.dictateAutofill) el.dictateAutofill.addEventListener('click', applyAiToContext);
 }
 
 function setNetworkStatus() {
@@ -1145,6 +1174,16 @@ async function ensureInlineContact(contactName, accountId) {
   populateActivityContacts(accountId);
   populateOpportunityContacts(accountId);
   return contact;
+}
+
+function selectAccountFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const accountId = params.get('accountId');
+  if (accountId && state.accounts.some((acc) => acc.id === accountId)) {
+    selectAccount(accountId);
+    return true;
+  }
+  return false;
 }
 
 function selectDefaultAccount() {
@@ -1671,7 +1710,13 @@ function normalizeRoleBucket(role = '') {
   return 'Other Stakeholders';
 }
 
-function openAiDrawer() {
+function setAiTarget(target = 'activity') {
+  state.aiTarget = target;
+  if (el.aiTargetSelect) el.aiTargetSelect.value = target;
+}
+
+function openAiDrawer(target = state.aiTarget || 'activity') {
+  setAiTarget(target);
   state.aiDrawerOpen = true;
   if (el.aiDrawer) el.aiDrawer.classList.remove('hidden');
 }
@@ -1698,6 +1743,196 @@ function rejectAiExtraction() {
   if (el.aiStructuredPreview) el.aiStructuredPreview.textContent = 'Run extraction to see structured data.';
   updateAiConfidenceBadge(null);
   toast('AI output rejected', 'warning');
+}
+
+function getTranscriptText() {
+  return (el.aiTranscript?.value || state.dictation.transcript || '').trim();
+}
+
+function applyAiToContext() {
+  const target = state.aiTarget || 'activity';
+  if (target === 'activity') {
+    applyExtractionToForm();
+    return;
+  }
+  const transcript = getTranscriptText();
+  if (!transcript) {
+    toast('Transcribe or paste notes first.', 'warning');
+    return;
+  }
+  switch (target) {
+    case 'account':
+      applyAccountTranscript(transcript);
+      break;
+    case 'opportunity':
+      applyOpportunityTranscript(transcript);
+      break;
+    case 'contact':
+      applyContactTranscript(transcript);
+      break;
+    case 'lookup':
+      runLookupFromTranscript(transcript);
+      break;
+    default:
+      applyExtractionToForm();
+  }
+}
+
+function applyAccountTranscript(transcript) {
+  const extraction = buildAccountExtractionFromTranscript(transcript);
+  if (!extraction.name && !extraction.industry) {
+    toast('Could not find account fields in transcript.', 'warning');
+    return;
+  }
+  if (extraction.name && el.newAccountName) el.newAccountName.value = extraction.name;
+  if (extraction.industry && el.newAccountIndustry) el.newAccountIndustry.value = extraction.industry;
+  if (extraction.city && el.newAccountCity) el.newAccountCity.value = extraction.city;
+  if (extraction.state && el.newAccountState) el.newAccountState.value = extraction.state;
+  if (extraction.entrenchment && el.newAccountEntrenchment) el.newAccountEntrenchment.value = extraction.entrenchment;
+  if (extraction.stage && el.newAccountStage) el.newAccountStage.value = extraction.stage;
+  if (extraction.nextStep && el.newAccountNextStep) el.newAccountNextStep.value = extraction.nextStep;
+  if (extraction.ownerId && el.newAccountOwner) el.newAccountOwner.value = extraction.ownerId;
+  if (el.newAccountStatus) el.newAccountStatus.textContent = 'AI filled account fields from transcript.';
+  if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = 'Applied to new account card.';
+  toast('Applied AI to new account card', 'success');
+}
+
+function buildAccountExtractionFromTranscript(transcript = '') {
+  const lower = transcript.toLowerCase();
+  const result = {};
+  const nameMatch = transcript.match(/(?:add|create|new)\s+([A-Za-z0-9&.'\- ]+?)(?:\sin the|\sin\s|,|\.)/i);
+  if (nameMatch) result.name = nameMatch[1].trim();
+  const industryMatch = transcript.match(/in the ([A-Za-z0-9&.'\- ]+?) industry/i);
+  if (industryMatch) result.industry = industryMatch[1].trim();
+  const locationMatch = transcript.match(/located in ([A-Za-z0-9.'\- ]+),?\s*([A-Za-z]{2})/i);
+  if (locationMatch) {
+    result.city = locationMatch[1].trim();
+    result.state = locationMatch[2].toUpperCase();
+  }
+  const entrenchmentMatch = transcript.match(/entrenchment (?:level\s*)?(?:is|let's call it)?\s*([A-Za-z ]+)/i);
+  if (entrenchmentMatch) result.entrenchment = matchEntrenchment(entrenchmentMatch[1]);
+  const stageMatch = transcript.match(/(?:phase|stage)\s*(?:is|at|for now)?\s*([A-Za-z 0-9]+)/i);
+  if (stageMatch) result.stage = matchStage(stageMatch[1]);
+  if (!result.stage) result.stage = ECD_STAGES.find((stage) => lower.includes(stage.toLowerCase())) || '';
+  const ownerMatch = transcript.match(/account owner is ([A-Za-z .'’-]+)/i);
+  if (ownerMatch) {
+    const ownerMeta = resolveOwnerByName(ownerMatch[1]);
+    if (ownerMeta?.id) result.ownerId = ownerMeta.id;
+  }
+  const nextStepMatch = transcript.match(/next step (?:is|:)?\s*([^\.]+)/i);
+  if (nextStepMatch) result.nextStep = nextStepMatch[1].trim();
+  return result;
+}
+
+function matchStage(input = '') {
+  const cleaned = input.trim().toLowerCase();
+  const found = ECD_STAGES.find((stage) => stage.toLowerCase().includes(cleaned) || cleaned.includes(stage.toLowerCase()));
+  return found || '';
+}
+
+function matchEntrenchment(input = '') {
+  const lower = input.toLowerCase();
+  if (lower.includes('high')) return 'High';
+  if (lower.includes('medium') || lower.includes('mid')) return 'Medium';
+  if (lower.includes('low')) return 'Low';
+  return '';
+}
+
+function resolveOwnerByName(name = '') {
+  const target = name.trim().toLowerCase();
+  return state.knownUsers.find((user) => (user.name || user.email || '').toLowerCase().includes(target)) || null;
+}
+
+function applyOpportunityTranscript(transcript) {
+  if (!el.opportunityDescription) {
+    toast('Opportunity form not available', 'warning');
+    return;
+  }
+  if (!el.opportunityDescription.value) el.opportunityDescription.value = transcript.slice(0, 240);
+  const valueMatch = transcript.match(/\$?([\d,.]+)\s?(k|m|million)?/i);
+  if (valueMatch && el.opportunityValue) {
+    const base = Number(valueMatch[1].replace(/,/g, ''));
+    const multiplier = valueMatch[2]?.toLowerCase().startsWith('m') ? 1_000_000 : valueMatch[2]?.toLowerCase().startsWith('k') ? 1_000 : 1;
+    const value = Math.round(base * multiplier);
+    if (!Number.isNaN(value)) el.opportunityValue.value = value;
+  }
+  const oppStage = matchOpportunityStage(transcript);
+  if (oppStage && el.opportunityStage) el.opportunityStage.value = oppStage;
+  if (el.opportunityNotes && !el.opportunityNotes.value) el.opportunityNotes.value = transcript;
+  if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = 'Applied to opportunity card.';
+  toast('Applied AI to opportunity card', 'success');
+}
+
+function matchOpportunityStage(transcript = '') {
+  const lower = transcript.toLowerCase();
+  if (lower.includes('lead')) return 'lead';
+  if (lower.includes('qualif')) return 'qualified';
+  if (lower.includes('proposal') || lower.includes('bid')) return 'proposal';
+  if (lower.includes('pilot')) return 'pilot';
+  if (lower.includes('expansion') || lower.includes('expand')) return 'expansion';
+  if (lower.includes('recurring') || lower.includes('renew')) return 'recurring';
+  return '';
+}
+
+function applyContactTranscript(transcript) {
+  if (!el.activityContactName) {
+    toast('Contact field not available', 'warning');
+    return;
+  }
+  const nameMatch = transcript.match(/(?:contact|person|name is)\s+([A-Za-z .'’-]+)/i);
+  if (nameMatch) el.activityContactName.value = nameMatch[1].trim();
+  else el.activityContactName.value = transcript.split(/[.,]/)[0].trim();
+  if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = 'Applied contact name to activity card.';
+  toast('Contact name applied from transcript', 'success');
+}
+
+function runLookupFromTranscript(transcript) {
+  const lookupMatch = transcript.match(/pull up ([^\.]+)|open ([^\.]+)/i);
+  const query = (lookupMatch?.[1] || lookupMatch?.[2] || transcript).trim().toLowerCase();
+  if (!query) {
+    toast('Could not parse account name to open.', 'warning');
+    return;
+  }
+  const account = state.accounts.find((acc) => acc.name?.toLowerCase() === query) ||
+    state.accounts.find((acc) => acc.name?.toLowerCase().includes(query));
+  if (!account) {
+    toast(`No account found for "${query}"`, 'warning');
+    return;
+  }
+  if (el.accountSearch) el.accountSearch.value = account.name;
+  selectAccount(account.id);
+  toast(`Opened ${account.name}`, 'success');
+}
+
+async function quickVoiceLookup() {
+  try {
+    recordedBlob = null;
+    recordedChunks = [];
+    setAiTarget('lookup');
+    setDictationStatus('Listening for account lookup...');
+    await startRecording();
+    setTimeout(() => stopRecording(), 4500);
+    const blob = await waitForRecordingResult();
+    const transcript = await transcribeAudio(blob);
+    state.dictation.transcript = transcript;
+    if (el.aiTranscript) el.aiTranscript.value = transcript;
+    runLookupFromTranscript(transcript);
+  } catch (err) {
+    console.warn('Voice lookup failed', err);
+    toast('Voice lookup failed', 'warning');
+  }
+}
+
+function waitForRecordingResult(timeoutMs = 9000) {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const tick = () => {
+      if (recordedBlob) return resolve(recordedBlob);
+      if (Date.now() - start > timeoutMs) return reject(new Error('Timed out waiting for recording'));
+      setTimeout(tick, 150);
+    };
+    tick();
+  });
 }
 
 function updateAiConfidenceBadge(confidence) {
@@ -3058,3 +3293,131 @@ function updateStalledAccounts() {
   renderSummaryPanel(getSelectedAccount());
 }
 
+async function openBriefingModal() {
+  const account = getSelectedAccount();
+  if (!account) {
+    toast('Select an account first.', 'warning');
+    return;
+  }
+  state.briefing = { open: true, loading: true, data: null, error: null };
+  if (el.briefingModal) el.briefingModal.classList.remove('hidden');
+  if (el.briefingTitle) el.briefingTitle.textContent = account.name || 'Customer Briefing';
+  if (el.briefingStatus) el.briefingStatus.textContent = 'Preparing briefing...';
+  if (el.briefingContent) el.briefingContent.hidden = true;
+  await loadBriefingForAccount(account);
+}
+
+function closeBriefingModal() {
+  state.briefing.open = false;
+  if (el.briefingModal) el.briefingModal.classList.add('hidden');
+}
+
+async function loadBriefingForAccount(account) {
+  try {
+    const payload = buildBriefingPayload(account);
+    const external = await fetchExternalInfo(account.name).catch(() => null);
+    if (external) payload.external = external;
+    const briefing = (await fetchBriefingFromApi(payload).catch(() => null)) || buildLocalBriefing(payload);
+    state.briefing = { open: true, loading: false, data: briefing, error: null };
+    renderBriefing(briefing);
+  } catch (err) {
+    console.warn('Briefing failed', err);
+    state.briefing = { open: true, loading: false, data: null, error: err };
+    if (el.briefingStatus) el.briefingStatus.textContent = 'Briefing failed. Try again.';
+  }
+}
+
+function buildBriefingPayload(account) {
+  const recentActivities = state.activities
+    .filter((a) => a.accountId === account.id)
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 5);
+  const openOpportunities = state.opportunities.filter((o) => o.accountId === account.id);
+  return {
+    account,
+    recentActivities,
+    opportunities: openOpportunities,
+    lastContact: recentActivities[0]?.date || account.lastContact,
+    internalNotes: [account.notes, recentActivities.map((a) => a.notes).join('\n')].filter(Boolean).join('\n').trim()
+  };
+}
+
+async function fetchExternalInfo(companyName) {
+  if (!companyName) return null;
+  const url = `${EXTERNAL_INFO_ENDPOINT}?company=${encodeURIComponent(companyName)}`;
+  const res = await fetch(url, { headers: getAuthHeaders() });
+  if (!res.ok) throw new Error('External info failed');
+  return res.json();
+}
+
+async function fetchBriefingFromApi(payload) {
+  const res = await fetch(AI_BRIEFING_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) throw new Error('Briefing API failed');
+  return res.json();
+}
+
+function buildLocalBriefing(payload) {
+  const activitySummary = payload.recentActivities.map((a) => `${formatDateString(a.date)} • ${a.subject || a.notes || 'Activity'}`).slice(0, 3);
+  return {
+    overview: `${payload.account.name} • ${payload.account.industry || ''} • ${payload.account.stage || ''}`.trim(),
+    internalHighlights: [
+      `Relationship: ${payload.account.relationshipHealth || 'Unknown'}`,
+      `Entrenchment: ${payload.account.entrenchment || 'Unknown'}`,
+      `Projected value: ${formatCurrency(payload.account.projectedValue || payload.account.annualPotential || 0)}`,
+      ...activitySummary
+    ],
+    externalHighlights: payload.external?.signals || payload.external?.news || [],
+    talkingPoints: ['Highlight recent wins', 'Ask about upcoming projects', 'Confirm next step'],
+    risks: ['Limited fresh intel — confirm decision maker', 'Check budget timeline'],
+    nextSteps: [payload.account.nextStep || 'Schedule next touchpoint'],
+    emailDraft: `Hi ${payload.account.ownerName || 'team'},\n\nThanks for the recent conversation with ${payload.account.name}. I'd like to align on next steps and discuss how we can help in the ${payload.account.stage || 'current'} phase.\n\nBest,\n${state.session?.user?.name || 'BD'}`
+  };
+}
+
+function renderBriefing(briefing) {
+  if (el.briefingStatus) el.briefingStatus.textContent = '';
+  if (el.briefingContent) el.briefingContent.hidden = false;
+  if (el.briefingOverview) el.briefingOverview.textContent = briefing.overview || 'No overview';
+  if (el.briefingInternal) el.briefingInternal.innerHTML = (briefing.internalHighlights || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('') || '<li>No internal highlights</li>';
+  if (el.briefingExternal) el.briefingExternal.innerHTML = (briefing.externalHighlights || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('') || '<li>No external signals</li>';
+  if (el.briefingTalkingPoints) el.briefingTalkingPoints.innerHTML = (briefing.talkingPoints || briefing.risks || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('') || '<li>No talking points</li>';
+  const nextSteps = (briefing.nextSteps || briefing.risks || []).map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+  if (el.briefingNextSteps) el.briefingNextSteps.innerHTML = nextSteps || '<li>No next steps</li>';
+  if (el.briefingEmail) el.briefingEmail.textContent = briefing.emailDraft || 'No draft generated.';
+}
+
+async function copyBriefingToClipboard() {
+  const briefing = state.briefing?.data;
+  if (!briefing) {
+    toast('Generate briefing first.', 'warning');
+    return;
+  }
+  const text = [
+    `Overview: ${briefing.overview || ''}`,
+    '',
+    'Internal:',
+    ...(briefing.internalHighlights || []),
+    '',
+    'External:',
+    ...(briefing.externalHighlights || []),
+    '',
+    'Talking points:',
+    ...(briefing.talkingPoints || []),
+    '',
+    'Next steps:',
+    ...(briefing.nextSteps || []),
+    '',
+    'Email draft:',
+    briefing.emailDraft || ''
+  ].join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Briefing copied', 'success');
+  } catch {
+    toast('Copy failed', 'warning');
+  }
+}
