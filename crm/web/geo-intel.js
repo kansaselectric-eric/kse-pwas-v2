@@ -39,8 +39,9 @@
   }
 
   async function initCache() {
-    db = await openDb('kse-geo-intel', 1, (db) => {
-      db.createObjectStore('cache');
+    db = await openDb('kse-geo-intel', 2, (db) => {
+      if (!db.objectStoreNames.contains('cache')) db.createObjectStore('cache');
+      if (!db.objectStoreNames.contains('geocode')) db.createObjectStore('geocode');
     });
   }
 
@@ -53,17 +54,17 @@
     });
   }
 
-  function putCache(key, value) {
+  function putCache(key, value, store = 'cache') {
     if (!db) return;
-    const tx = db.transaction('cache', 'readwrite');
-    tx.objectStore('cache').put(value, key);
+    const tx = db.transaction(store, 'readwrite');
+    tx.objectStore(store).put(value, key);
   }
 
-  function getCache(key) {
+  function getCache(key, store = 'cache') {
     return new Promise((resolve) => {
       if (!db) return resolve(null);
-      const tx = db.transaction('cache', 'readonly');
-      const req = tx.objectStore('cache').get(key);
+      const tx = db.transaction(store, 'readonly');
+      const req = tx.objectStore(store).get(key);
       req.onsuccess = () => resolve(req.result || null);
       req.onerror = () => resolve(null);
     });
@@ -154,11 +155,11 @@
         fetchJson(ENDPOINTS.prospects)
       ]);
       if (Array.isArray(customers)) {
-        state.data.customers = customers;
+        state.data.customers = await ensureCoordinates(customers);
         putCache('customers', customers);
       }
       if (Array.isArray(prospects)) {
-        state.data.prospects = prospects;
+        state.data.prospects = await ensureCoordinates(prospects);
         putCache('prospects', prospects);
       }
       status && (status.textContent = 'Online');
@@ -298,5 +299,52 @@
 
   function escapeHtml(str = '') {
     return str.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c] || c);
+  }
+
+  async function ensureCoordinates(items = []) {
+    const enriched = [];
+    for (const item of items) {
+      if (item.latitude && item.longitude) {
+        enriched.push(item);
+        continue;
+      }
+      const key = buildGeoKey(item);
+      if (!key) {
+        enriched.push(item);
+        continue;
+      }
+      const cached = await getCache(key, 'geocode');
+      if (cached?.lat && cached?.lng) {
+        enriched.push({ ...item, latitude: cached.lat, longitude: cached.lng });
+        continue;
+      }
+      const coords = await geocodeLocation(key).catch(() => null);
+      if (coords?.lat && coords?.lng) {
+        putCache(key, coords, 'geocode');
+        enriched.push({ ...item, latitude: coords.lat, longitude: coords.lng });
+      } else {
+        enriched.push(item);
+      }
+    }
+    return enriched;
+  }
+
+  function buildGeoKey(item) {
+    const parts = [item.projectAddress, item.projectCity, item.projectState, item.city, item.state]
+      .filter(Boolean)
+      .map((s) => String(s).trim());
+    if (!parts.length) return '';
+    return parts.join(', ');
+  }
+
+  async function geocodeLocation(query) {
+    const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+    const res = await fetch(url, { headers: { 'User-Agent': 'kse-geo-intel' } });
+    if (!res.ok) throw new Error('geocode failed');
+    const data = await res.json();
+    if (Array.isArray(data) && data[0]) {
+      return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+    }
+    return null;
   }
 })();

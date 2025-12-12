@@ -271,6 +271,7 @@ const el = {
   aiExtractionStatus: document.getElementById('aiExtractionStatus'),
   aiStructuredPreview: document.getElementById('aiStructuredPreview'),
   aiConfidenceBadge: document.getElementById('aiConfidenceBadge'),
+  aiForceApply: document.getElementById('aiForceApply'),
   prepBriefingBtn: document.getElementById('prepBriefingBtn'),
   briefingModal: document.getElementById('briefingModal'),
   briefingTitle: document.getElementById('briefingTitle'),
@@ -1732,8 +1733,160 @@ function applyExtractionNotesOnly() {
     toast('Run Extract Details first.', 'warning');
       return;
   }
-  if (extraction.notes) el.activityNotes.value = extraction.notes;
+  const notes = extraction.structured?.activity?.notes || extraction.notes || '';
+  if (notes) el.activityNotes.value = notes;
   toast('Applied AI notes only', 'info');
+}
+
+function normalizeExtractionResponse(raw) {
+  // Server now returns { ok, structured, ...legacyActivityKeys }. Keep UI safe either way.
+  const structured = raw?.structured || raw?.activity ? (raw?.structured || raw) : null;
+  const activity = structured?.activity || {
+    subject: raw?.subject || '',
+    notes: raw?.notes || '',
+    outcome: raw?.outcome || '',
+    nextFollowUp: raw?.nextFollowUp || '',
+    tags: Array.isArray(raw?.tags) ? raw.tags : [],
+    sentimentScore: typeof raw?.sentimentScore === 'number' ? raw.sentimentScore : 3,
+    movementTriggered: Boolean(raw?.movementTriggered),
+    movementStage: raw?.movementStage || '',
+    contactsMentioned: Array.isArray(raw?.contactsMentioned) ? raw.contactsMentioned : [],
+    accountInsights: Array.isArray(raw?.accountInsights) ? raw.accountInsights : []
+  };
+  const normalizedStructured = structured || {
+    activity,
+    account: raw?.account || {},
+    opportunity: raw?.opportunity || {},
+    contact: raw?.contact || {},
+    lookup: raw?.lookup || {}
+  };
+
+  return {
+    ...raw,
+    aiConfidence: raw?.aiConfidence ?? structured?.confidence ?? null,
+    warnings: Array.isArray(raw?.warnings) ? raw.warnings : Array.isArray(structured?.warnings) ? structured.warnings : [],
+    missingFields: Array.isArray(raw?.missingFields) ? raw.missingFields : Array.isArray(structured?.missingFields) ? structured.missingFields : [],
+    structured: {
+      confidence: structured?.confidence ?? null,
+      warnings: Array.isArray(structured?.warnings) ? structured.warnings : [],
+      missingFields: Array.isArray(structured?.missingFields) ? structured.missingFields : [],
+      activity: {
+        subject: activity.subject || '',
+        notes: activity.notes || '',
+        outcome: activity.outcome || '',
+        nextFollowUp: activity.nextFollowUp || '',
+        tags: Array.isArray(activity.tags) ? activity.tags : [],
+        sentimentScore: typeof activity.sentimentScore === 'number' ? activity.sentimentScore : 3,
+        movementTriggered: Boolean(activity.movementTriggered),
+        movementStage: activity.movementStage || '',
+        contactsMentioned: Array.isArray(activity.contactsMentioned) ? activity.contactsMentioned : [],
+        accountInsights: Array.isArray(activity.accountInsights) ? activity.accountInsights : []
+      },
+      account: {
+        name: normalizedStructured.account?.name || '',
+        industry: normalizedStructured.account?.industry || '',
+        city: normalizedStructured.account?.city || '',
+        state: normalizedStructured.account?.state || '',
+        entrenchment: normalizedStructured.account?.entrenchment || '',
+        stage: normalizedStructured.account?.stage || '',
+        ownerName: normalizedStructured.account?.ownerName || '',
+        relationshipHealth: normalizedStructured.account?.relationshipHealth || '',
+        nextStep: normalizedStructured.account?.nextStep || '',
+        notes: normalizedStructured.account?.notes || ''
+      },
+      opportunity: {
+        description: normalizedStructured.opportunity?.description || '',
+        value: Number(normalizedStructured.opportunity?.value || 0),
+        stage: normalizedStructured.opportunity?.stage || '',
+        status: normalizedStructured.opportunity?.status || ''
+      },
+      contact: {
+        name: normalizedStructured.contact?.name || '',
+        role: normalizedStructured.contact?.role || '',
+        email: normalizedStructured.contact?.email || '',
+        phone: normalizedStructured.contact?.phone || ''
+      },
+      lookup: {
+        accountName: normalizedStructured.lookup?.accountName || ''
+      }
+    }
+  };
+}
+
+function renderStructuredPreview(extraction) {
+  if (!el.aiStructuredPreview) return;
+  const target = state.aiTarget || 'activity';
+  const s = extraction?.structured || {};
+  const warningHtml = (Array.isArray(extraction?.warnings) && extraction.warnings.length) || (Array.isArray(s?.warnings) && s.warnings.length)
+    ? `<div class="mt-2 p-2 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-xs">
+        <p class="font-semibold mb-1">Warnings</p>
+        <ul class="list-disc list-inside">${(extraction.warnings || s.warnings).map((w) => `<li>${escapeHtml(String(w))}</li>`).join('')}</ul>
+      </div>`
+    : '';
+  const missingHtml = (Array.isArray(extraction?.missingFields) && extraction.missingFields.length) || (Array.isArray(s?.missingFields) && s.missingFields.length)
+    ? `<div class="mt-2 p-2 rounded-lg border border-slate-200 bg-slate-50 text-slate-700 text-xs">
+        <p class="font-semibold mb-1">Missing fields</p>
+        <div class="flex flex-wrap gap-1">${(extraction.missingFields || s.missingFields).slice(0, 12).map((m) => `<span class="px-2 py-0.5 rounded-full border border-slate-200 bg-white">${escapeHtml(String(m))}</span>`).join('')}</div>
+      </div>`
+    : '';
+  if (target === 'account') {
+    const a = s.account || {};
+    el.aiStructuredPreview.innerHTML = `
+      <p><strong>Account:</strong> ${escapeHtml(a.name || '')}</p>
+      <p><strong>Industry:</strong> ${escapeHtml(a.industry || '')}</p>
+      <p><strong>Location:</strong> ${escapeHtml([a.city, a.state].filter(Boolean).join(', '))}</p>
+      <p><strong>Entrenchment:</strong> ${escapeHtml(a.entrenchment || '')}</p>
+      <p><strong>Stage:</strong> ${escapeHtml(a.stage || '')}</p>
+      <p><strong>Owner:</strong> ${escapeHtml(a.ownerName || '')}</p>
+      <p><strong>Next step:</strong> ${escapeHtml(a.nextStep || '')}</p>
+      ${warningHtml}
+      ${missingHtml}
+    `;
+    return;
+  }
+  if (target === 'opportunity') {
+    const o = s.opportunity || {};
+    el.aiStructuredPreview.innerHTML = `
+      <p><strong>Description:</strong> ${escapeHtml(o.description || '')}</p>
+      <p><strong>Value:</strong> ${escapeHtml(String(o.value || 0))}</p>
+      <p><strong>Stage:</strong> ${escapeHtml(o.stage || '')}</p>
+      <p><strong>Status:</strong> ${escapeHtml(o.status || '')}</p>
+      ${warningHtml}
+      ${missingHtml}
+    `;
+    return;
+  }
+  if (target === 'contact') {
+    const c = s.contact || {};
+    el.aiStructuredPreview.innerHTML = `
+      <p><strong>Name:</strong> ${escapeHtml(c.name || '')}</p>
+      <p><strong>Role:</strong> ${escapeHtml(c.role || '')}</p>
+      <p><strong>Email:</strong> ${escapeHtml(c.email || '')}</p>
+      <p><strong>Phone:</strong> ${escapeHtml(c.phone || '')}</p>
+      ${warningHtml}
+      ${missingHtml}
+    `;
+    return;
+  }
+  if (target === 'lookup') {
+    const l = s.lookup || {};
+    el.aiStructuredPreview.innerHTML = `
+      <p><strong>Lookup:</strong> ${escapeHtml(l.accountName || '')}</p>
+      ${warningHtml}
+      ${missingHtml}
+    `;
+    return;
+  }
+
+  const act = s.activity || {};
+  el.aiStructuredPreview.innerHTML = `
+    <p><strong>Subject:</strong> ${escapeHtml(act.subject || '')}</p>
+    <p><strong>Outcome:</strong> ${escapeHtml(act.outcome || '')}</p>
+    <p><strong>Next Follow-Up:</strong> ${escapeHtml(act.nextFollowUp || '')}</p>
+    <p><strong>Tags:</strong> ${(act.tags || []).map((tag) => `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-xs">${escapeHtml(tag)}</span>`).join(' ')}</p>
+    ${warningHtml}
+    ${missingHtml}
+  `;
 }
 
 function rejectAiExtraction() {
@@ -1751,31 +1904,93 @@ function getTranscriptText() {
 
 function applyAiToContext() {
   const target = state.aiTarget || 'activity';
+  const confidence = state.dictation.extraction?.aiConfidence;
+  const forceApply = Boolean(el.aiForceApply?.checked);
+  if (confidence != null && confidence < 0.7 && !forceApply) {
+    toast('AI confidence is low — review warnings or enable Force apply.', 'warning');
+    if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = `Low confidence (${(confidence * 100).toFixed(0)}%). Review warnings or enable Force apply.`;
+    return;
+  }
   if (target === 'activity') {
     applyExtractionToForm();
     return;
   }
+  const extraction = state.dictation.extraction;
+  const structured = extraction?.structured;
   const transcript = getTranscriptText();
-  if (!transcript) {
-    toast('Transcribe or paste notes first.', 'warning');
+  if (!structured && !transcript) {
+    toast('Transcribe then Extract first.', 'warning');
     return;
   }
   switch (target) {
     case 'account':
-      applyAccountTranscript(transcript);
+      if (structured?.account?.name || structured?.account?.industry || structured?.account?.city || structured?.account?.state) {
+        applyAccountStructured(structured.account);
+      } else {
+        applyAccountTranscript(transcript);
+      }
       break;
     case 'opportunity':
-      applyOpportunityTranscript(transcript);
+      if (structured?.opportunity?.description || structured?.opportunity?.value) {
+        applyOpportunityStructured(structured.opportunity);
+      } else {
+        applyOpportunityTranscript(transcript);
+      }
       break;
     case 'contact':
-      applyContactTranscript(transcript);
+      if (structured?.contact?.name) {
+        applyContactStructured(structured.contact);
+      } else {
+        applyContactTranscript(transcript);
+      }
       break;
     case 'lookup':
-      runLookupFromTranscript(transcript);
+      if (structured?.lookup?.accountName) {
+        runLookupFromTranscript(structured.lookup.accountName);
+      } else {
+        runLookupFromTranscript(transcript);
+      }
       break;
     default:
       applyExtractionToForm();
   }
+}
+
+function applyAccountStructured(account) {
+  if (account?.name && el.newAccountName) el.newAccountName.value = account.name;
+  if (account?.industry && el.newAccountIndustry) el.newAccountIndustry.value = account.industry;
+  if (account?.city && el.newAccountCity) el.newAccountCity.value = account.city;
+  if (account?.state && el.newAccountState) el.newAccountState.value = account.state;
+  if (account?.entrenchment && el.newAccountEntrenchment) el.newAccountEntrenchment.value = matchEntrenchment(account.entrenchment) || account.entrenchment;
+  if (account?.stage && el.newAccountStage) el.newAccountStage.value = matchStage(account.stage) || account.stage;
+  if (account?.relationshipHealth && el.newAccountRelationship) el.newAccountRelationship.value = account.relationshipHealth;
+  if (account?.nextStep && el.newAccountNextStep) el.newAccountNextStep.value = account.nextStep;
+  if (account?.ownerName && el.newAccountOwner) {
+    const ownerMeta = resolveOwnerByName(account.ownerName);
+    if (ownerMeta?.id) el.newAccountOwner.value = ownerMeta.id;
+  }
+  if (account?.notes && el.newAccountNotes && !el.newAccountNotes.value) el.newAccountNotes.value = account.notes;
+  if (el.newAccountStatus) el.newAccountStatus.textContent = 'AI filled account fields (JSON extraction).';
+  if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = 'Applied to new account card.';
+  toast('Applied AI to new account card', 'success');
+}
+
+function applyOpportunityStructured(opportunity) {
+  if (opportunity?.description && el.opportunityDescription) el.opportunityDescription.value = opportunity.description;
+  if (opportunity?.value != null && el.opportunityValue) el.opportunityValue.value = String(Number(opportunity.value || 0));
+  if (opportunity?.status && el.opportunityStatus) el.opportunityStatus.value = opportunity.status;
+  if (opportunity?.stage && el.opportunityStage) {
+    const mapped = matchOpportunityStage(String(opportunity.stage));
+    if (mapped) el.opportunityStage.value = mapped;
+  }
+  if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = 'Applied to opportunity card.';
+  toast('Applied AI to opportunity card', 'success');
+}
+
+function applyContactStructured(contact) {
+  if (contact?.name && el.activityContactName) el.activityContactName.value = contact.name;
+  if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = 'Applied contact name to activity card.';
+  toast('Contact name applied (JSON extraction)', 'success');
 }
 
 function applyAccountTranscript(transcript) {
@@ -3070,18 +3285,11 @@ async function handleExtractionRequest() {
   }
   el.aiExtractionStatus.textContent = 'Extracting structured data...';
   try {
-    const extraction = await extractBDInsights(transcript);
+    const extraction = normalizeExtractionResponse(await extractBDInsights(transcript));
     state.dictation.extraction = extraction;
-    el.aiExtractionStatus.textContent = `AI ready (confidence ${(extraction.aiConfidence * 100 || 0).toFixed(0)}%)`;
+    el.aiExtractionStatus.textContent = 'AI ready';
     updateAiConfidenceBadge(extraction.aiConfidence);
-    if (el.aiStructuredPreview) {
-      el.aiStructuredPreview.innerHTML = `
-        <p><strong>Subject:</strong> ${escapeHtml(extraction.subject || '')}</p>
-        <p><strong>Outcome:</strong> ${escapeHtml(extraction.outcome || '')}</p>
-        <p><strong>Next Follow-Up:</strong> ${escapeHtml(extraction.nextFollowUp || '')}</p>
-        <p><strong>Tags:</strong> ${(extraction.tags || []).map((tag) => `<span class="px-2 py-0.5 rounded-full bg-slate-800 text-xs">${escapeHtml(tag)}</span>`).join(' ')}</p>
-      `;
-    }
+    renderStructuredPreview(extraction);
     toast('AI extraction complete', 'success');
   } catch (err) {
     console.error(err);
@@ -3096,17 +3304,25 @@ function applyExtractionToForm() {
     toast('Run Extract Details first.', 'warning');
     return;
   }
-  if (extraction.subject) el.activitySubject.value = extraction.subject;
-  if (extraction.notes) el.activityNotes.value = extraction.notes;
-  if (Array.isArray(extraction.tags)) el.activityTags.value = extraction.tags.join(', ');
-  if (extraction.sentiment != null) {
-    el.activitySentiment.value = extraction.sentiment;
-    el.sentimentValue.textContent = `(${extraction.sentiment})`;
+  const confidence = extraction.aiConfidence;
+  const forceApply = Boolean(el.aiForceApply?.checked);
+  if (confidence != null && confidence < 0.7 && !forceApply) {
+    toast('AI confidence is low — review warnings or enable Force apply.', 'warning');
+    if (el.aiExtractionStatus) el.aiExtractionStatus.textContent = `Low confidence (${(confidence * 100).toFixed(0)}%). Review warnings or enable Force apply.`;
+    return;
   }
-  if (extraction.nextFollowUp) el.activityNextFollowUp.value = extraction.nextFollowUp;
-  if (extraction.outcome) el.activityOutcome.value = extraction.outcome;
-  if (extraction.movementTriggered && extraction.movementStage) {
-    el.stageNextSelect.value = extraction.movementStage;
+  const activity = extraction.structured?.activity || {};
+  if (activity.subject) el.activitySubject.value = activity.subject;
+  if (activity.notes) el.activityNotes.value = activity.notes;
+  if (Array.isArray(activity.tags)) el.activityTags.value = activity.tags.join(', ');
+  if (activity.sentimentScore != null && el.activitySentiment) {
+    el.activitySentiment.value = String(activity.sentimentScore);
+    if (el.sentimentValue) el.sentimentValue.textContent = `(${activity.sentimentScore})`;
+  }
+  if (activity.nextFollowUp) el.activityNextFollowUp.value = activity.nextFollowUp;
+  if (activity.outcome) el.activityOutcome.value = activity.outcome;
+  if (activity.movementTriggered && activity.movementStage) {
+    el.stageNextSelect.value = activity.movementStage;
     toast('AI recommends stage movement', 'info');
   }
   toast('AI fields applied', 'success');
