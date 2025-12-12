@@ -22,6 +22,8 @@ const CRM_SYNC_ENDPOINT = `${API_BASE}/crm`;
 const AI_TRANSCRIBE_ENDPOINT = `${API_BASE}/transcribe`;
 const AI_EXTRACT_ENDPOINT = `${API_BASE}/extractBD`;
 const AI_BRIEFING_ENDPOINT = `${API_BASE}/briefing`;
+const AI_DEBRIEF_ENDPOINT = `${API_BASE}/debrief`;
+const AI_GAMEPLAN_ENDPOINT = `${API_BASE}/gameplan`;
 const EXTERNAL_INFO_ENDPOINT = `${API_BASE}/external-info`;
 
 const DB_NAME = 'kse-enterprise-crm';
@@ -117,6 +119,7 @@ const state = {
   aiTarget: 'activity',
   projectFilter: 'all',
   briefing: { open: false, loading: false, data: null, error: null },
+  debrief: { data: null },
   knownUsers: [...DEMO_USERS]
 };
 
@@ -221,6 +224,7 @@ const el = {
   generateWeeklyBtn: document.getElementById('generateWeeklyBtn'),
   copyWeeklySummary: document.getElementById('copyWeeklySummary'),
   weeklySummaryCsvBtn: document.getElementById('weeklySummaryCsvBtn'),
+  generateGameplanBtn: document.getElementById('generateGameplanBtn'),
   weeklySummaryText: document.getElementById('weeklySummaryText'),
   weeklySummaryStatus: document.getElementById('weeklySummaryStatus'),
   exportPipeline: document.getElementById('exportPipeline'),
@@ -285,6 +289,20 @@ const el = {
   briefingEmail: document.getElementById('briefingEmail'),
   closeBriefingBtn: document.getElementById('closeBriefingBtn'),
   copyBriefingBtn: document.getElementById('copyBriefingBtn'),
+  debriefBtn: document.getElementById('debriefBtn'),
+  debriefModal: document.getElementById('debriefModal'),
+  debriefTitle: document.getElementById('debriefTitle'),
+  debriefOpportunitySelect: document.getElementById('debriefOpportunitySelect'),
+  debriefStatus: document.getElementById('debriefStatus'),
+  debriefContent: document.getElementById('debriefContent'),
+  debriefCurrentState: document.getElementById('debriefCurrentState'),
+  debriefMeetingPlan: document.getElementById('debriefMeetingPlan'),
+  debriefQuestions: document.getElementById('debriefQuestions'),
+  debriefRisks: document.getElementById('debriefRisks'),
+  debriefNextSteps: document.getElementById('debriefNextSteps'),
+  debriefEmail: document.getElementById('debriefEmail'),
+  closeDebriefBtn: document.getElementById('closeDebriefBtn'),
+  copyDebriefBtn: document.getElementById('copyDebriefBtn'),
   toastContainer: document.getElementById('toastContainer')
 };
 
@@ -643,6 +661,9 @@ function attachGlobalListeners() {
   if (el.prepBriefingBtn) el.prepBriefingBtn.addEventListener('click', openBriefingModal);
   if (el.closeBriefingBtn) el.closeBriefingBtn.addEventListener('click', closeBriefingModal);
   if (el.copyBriefingBtn) el.copyBriefingBtn.addEventListener('click', copyBriefingToClipboard);
+  if (el.debriefBtn) el.debriefBtn.addEventListener('click', openDebriefModal);
+  if (el.closeDebriefBtn) el.closeDebriefBtn.addEventListener('click', closeDebriefModal);
+  if (el.copyDebriefBtn) el.copyDebriefBtn.addEventListener('click', copyDebriefToClipboard);
 }
 
 function showLoginView(message = '') {
@@ -976,6 +997,7 @@ function ensureAppEventListeners() {
     el.projectOpportunitiesList.addEventListener('click', handleProjectOpportunityClick);
   }
   if (el.generateWeeklyBtn) el.generateWeeklyBtn.addEventListener('click', generateWeeklySummary);
+  if (el.generateGameplanBtn) el.generateGameplanBtn.addEventListener('click', generateWeeklyGameplan);
   if (el.copyWeeklySummary) el.copyWeeklySummary.addEventListener('click', copyWeeklySummaryToClipboard);
   if (el.weeklySummaryCsvBtn) el.weeklySummaryCsvBtn.addEventListener('click', downloadWeeklySummaryCsv);
   // Unified export controls (date range required)
@@ -3636,4 +3658,193 @@ async function copyBriefingToClipboard() {
   } catch {
     toast('Copy failed', 'warning');
   }
+}
+
+async function openDebriefModal() {
+  const account = getSelectedAccount();
+  if (!account) {
+    toast('Select an account first.', 'warning');
+    return;
+  }
+  if (el.debriefModal) el.debriefModal.classList.remove('hidden');
+  if (el.debriefTitle) el.debriefTitle.textContent = account.name || 'Debrief';
+  if (el.debriefStatus) el.debriefStatus.textContent = 'Preparing debrief...';
+  if (el.debriefContent) el.debriefContent.hidden = true;
+  populateDebriefOpportunitySelect(account.id);
+  const initialOpportunityId = el.debriefOpportunitySelect?.value || el.activityOpportunity?.value || '';
+  if (el.debriefOpportunitySelect && initialOpportunityId && el.debriefOpportunitySelect.querySelector(`option[value="${CSS.escape(initialOpportunityId)}"]`)) {
+    el.debriefOpportunitySelect.value = initialOpportunityId;
+  }
+  if (el.debriefOpportunitySelect) {
+    el.debriefOpportunitySelect.onchange = () => loadDebrief(account.id, el.debriefOpportunitySelect.value || null);
+  }
+  await loadDebrief(account.id, el.debriefOpportunitySelect?.value || null);
+}
+
+function closeDebriefModal() {
+  if (el.debriefModal) el.debriefModal.classList.add('hidden');
+}
+
+async function fetchDebrief(body) {
+  const res = await fetch(AI_DEBRIEF_ENDPOINT, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`Debrief failed ${res.status}`);
+  return res.json();
+}
+
+function populateDebriefOpportunitySelect(accountId) {
+  if (!el.debriefOpportunitySelect) return;
+  const options = [
+    `<option value="">Account-level</option>`,
+    ...state.opportunities
+      .filter((o) => o.accountId === accountId)
+      .map((o) => `<option value="${escapeHtml(o.id)}">${escapeHtml(o.projectName || o.description || o.id)}</option>`)
+  ];
+  el.debriefOpportunitySelect.innerHTML = options.join('');
+}
+
+async function loadDebrief(accountId, opportunityId) {
+  try {
+    if (el.debriefStatus) el.debriefStatus.textContent = 'Preparing debrief...';
+    if (el.debriefContent) el.debriefContent.hidden = true;
+    const debrief = await fetchDebrief({ accountId, opportunityId: opportunityId || null });
+    renderDebrief(debrief);
+  } catch (err) {
+    console.warn('Debrief failed', err);
+    if (el.debriefStatus) el.debriefStatus.textContent = 'Debrief failed. Try again.';
+    toast('Debrief failed', 'warning');
+  }
+}
+
+function renderDebrief(debrief) {
+  if (el.debriefStatus) el.debriefStatus.textContent = '';
+  if (el.debriefContent) el.debriefContent.hidden = false;
+  if (el.debriefCurrentState) el.debriefCurrentState.textContent = debrief.currentState || debrief.overview || '—';
+  if (el.debriefMeetingPlan) el.debriefMeetingPlan.innerHTML = (debrief.meetingPlan || []).map((x) => `<li>${escapeHtml(x)}</li>`).join('') || '<li>—</li>';
+  if (el.debriefQuestions) el.debriefQuestions.innerHTML = (debrief.discoveryQuestions || []).map((x) => `<li>${escapeHtml(x)}</li>`).join('') || '<li>—</li>';
+  if (el.debriefRisks) el.debriefRisks.innerHTML = (debrief.risks || []).map((x) => `<li>${escapeHtml(x)}</li>`).join('') || '<li>—</li>';
+  if (el.debriefNextSteps) el.debriefNextSteps.innerHTML = (debrief.nextSteps || []).map((x) => `<li>${escapeHtml(x)}</li>`).join('') || '<li>—</li>';
+  if (el.debriefEmail) el.debriefEmail.textContent = debrief.emailDraft || '';
+  // Keep for copy
+  state.debrief = { data: debrief };
+}
+
+async function copyDebriefToClipboard() {
+  const debrief = state.debrief?.data;
+  if (!debrief) {
+    toast('Generate debrief first.', 'warning');
+    return;
+  }
+  const text = [
+    `Current state: ${debrief.currentState || ''}`,
+    '',
+    'Meeting plan:',
+    ...(debrief.meetingPlan || []),
+    '',
+    'Discovery questions:',
+    ...(debrief.discoveryQuestions || []),
+    '',
+    'Risks / objections:',
+    ...(debrief.risks || []),
+    '',
+    'Next steps:',
+    ...(debrief.nextSteps || []),
+    '',
+    'Email draft:',
+    debrief.emailDraft || ''
+  ].join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Debrief copied', 'success');
+  } catch {
+    toast('Copy failed', 'warning');
+  }
+}
+
+async function generateWeeklyGameplan() {
+  if (!el.weeklySummaryText || !el.weeklySummaryStatus) return;
+  el.weeklySummaryStatus.textContent = 'Generating weekly gameplan...';
+  el.weeklySummaryText.value = 'Generating weekly BD gameplan...';
+  const now = new Date();
+  const start = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const payload = {
+    startDate: start.toISOString(),
+    endDate: now.toISOString(),
+    accounts: state.accounts,
+    activities: state.activities,
+    movements: state.movements,
+    opportunities: state.opportunities
+  };
+  try {
+    const res = await fetch(AI_GAMEPLAN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error(`Gameplan failed ${res.status}`);
+    const data = await res.json();
+    const plan = data.plan || data;
+    const text = formatGameplanText(plan, start, now);
+    el.weeklySummaryText.value = text;
+    el.weeklySummaryStatus.textContent = `Gameplan generated ${new Date().toLocaleString()}`;
+    state.latestSummaryCsv = {
+      headers: ['Section', 'Value'],
+      rows: [
+        ['Headline', plan.headline || ''],
+        ['TopPriorities', (plan.priorities || []).map((p) => `${p.accountName || p.account || ''}: ${p.nextAction || (p.actions || []).join(', ')}`).join('; ')],
+        ['Risks', (plan.risks || []).join('; ')],
+        ['KPIs', (plan.kpis || plan.metrics || []).join('; ')]
+      ]
+    };
+    toast('Weekly gameplan ready', 'success');
+  } catch (err) {
+    console.warn('Gameplan failed', err);
+    el.weeklySummaryText.value = generateWeeklySummary();
+    el.weeklySummaryStatus.textContent = 'Gameplan failed; used local summary fallback.';
+    toast('Gameplan failed (fallback used)', 'warning');
+  }
+}
+
+function formatGameplanText(plan, start, end) {
+  const lines = [];
+  lines.push(`Weekly BD Gameplan (${start.toLocaleDateString()} - ${end.toLocaleDateString()})`);
+  lines.push('');
+  if (plan.headline) lines.push(`Headline: ${plan.headline}`);
+  if (plan.focus) lines.push(`Focus: ${plan.focus}`);
+  lines.push('');
+  lines.push('Top priorities:');
+  (plan.priorities || []).slice(0, 8).forEach((p, idx) => {
+    lines.push(`${idx + 1}. ${p.accountName || p.account || 'Account'} — ${p.why || ''}`.trim());
+    const action = p.nextAction || (Array.isArray(p.actions) ? p.actions.join(' | ') : '');
+    if (action) lines.push(`   Next: ${action}`);
+    if (p.when) lines.push(`   When: ${p.when}`);
+  });
+  lines.push('');
+  if (Array.isArray(plan.schedule) && plan.schedule.length) {
+    lines.push('Suggested schedule:');
+    plan.schedule.forEach((day) => {
+      lines.push(`- ${day.day || 'Day'}:`);
+      (day.blocks || []).forEach((b) => lines.push(`  - ${b}`));
+    });
+    lines.push('');
+  }
+  if (Array.isArray(plan.risks) && plan.risks.length) {
+    lines.push('Risks / watchouts:');
+    plan.risks.forEach((r) => lines.push(`- ${r}`));
+    lines.push('');
+  }
+  const kpis = plan.kpis || plan.metrics || [];
+  if (Array.isArray(kpis) && kpis.length) {
+    lines.push('KPIs for the week:');
+    kpis.forEach((k) => lines.push(`- ${k}`));
+    lines.push('');
+  }
+  if (plan.notes) {
+    lines.push('Notes:');
+    lines.push(String(plan.notes));
+  }
+  return lines.join('\n').trim();
 }

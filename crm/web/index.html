@@ -610,6 +610,7 @@
             <div id="weeklyTab" class="tab-panel hidden space-y-4">
               <div class="flex flex-wrap gap-2">
                 <button id="generateWeeklyBtn" class="rounded-xl btn-kse px-4 py-2 font-semibold">Generate Weekly BD Summary</button>
+                <button id="generateGameplanBtn" class="rounded-xl border border-brand/40 px-4 py-2 text-sm text-brand hover:bg-brand/10">Weekly BD Gameplan</button>
                 <button id="copyWeeklySummary" class="rounded-xl border border-white/20 px-4 py-2 text-sm text-white">Copy Text</button>
                 <button id="weeklySummaryCsvBtn" class="rounded-xl border border-white/20 px-4 py-2 text-sm text-white">Download CSV</button>
               </div>
@@ -626,6 +627,7 @@
             <div class="flex items-center gap-3">
               <h3 class="text-lg font-semibold">Account Summary</h3>
               <button id="prepBriefingBtn" type="button" class="text-xs rounded-full px-3 py-1.5 border border-brand text-brand hover:bg-brand/10">Prep Briefing</button>
+              <button id="debriefBtn" type="button" class="text-xs rounded-full px-3 py-1.5 border border-kse-orange text-kse-orange hover:bg-kse-orange/10">Debrief / Gameplan</button>
             </div>
             <span id="stalledBadge" class="text-xs px-3 py-1 rounded-full border border-slate-700 text-slate-400">Healthy</span>
           </div>
@@ -801,6 +803,64 @@
               <p class="text-xs uppercase text-slate-500">Follow-up Email Draft</p>
               <pre id="briefingEmail" class="text-xs whitespace-pre-wrap text-slate-700"></pre>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="debriefModal" class="fixed inset-0 hidden z-50">
+    <div class="absolute inset-0 bg-black/50"></div>
+    <div class="relative h-full w-full max-w-4xl mx-auto my-6 bg-white rounded-2xl shadow-2xl flex flex-col glass-panel overflow-hidden">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+        <div>
+          <p class="text-xs uppercase tracking-[0.3em] text-slate-500">Debrief / Gameplan</p>
+          <h2 id="debriefTitle" class="text-xl font-semibold text-[var(--kse-text)]">Loading...</h2>
+          <p class="text-xs text-slate-500">Where the account is + how to run the next meeting.</p>
+        </div>
+        <div class="flex items-center gap-2 flex-wrap">
+          <label class="text-xs text-slate-500 flex items-center gap-2">
+            Opportunity
+            <select id="debriefOpportunitySelect" class="panel-input text-sm">
+              <option value="">Account-level</option>
+            </select>
+          </label>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="copyDebriefBtn" class="text-xs rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-100">Copy</button>
+          <button id="closeDebriefBtn" class="text-xs rounded-full border border-slate-200 px-3 py-1.5 text-slate-600 hover:bg-slate-100">Close</button>
+        </div>
+      </div>
+      <div class="p-6 space-y-3 overflow-y-auto">
+        <div id="debriefStatus" class="text-sm text-slate-500">Preparing debrief...</div>
+        <div id="debriefContent" hidden class="space-y-4">
+          <div class="rounded-xl border border-slate-200 p-3 bg-slate-50">
+            <p class="text-xs uppercase text-slate-500">Current state</p>
+            <div id="debriefCurrentState" class="text-sm text-slate-700"></div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Meeting plan</p>
+              <ul id="debriefMeetingPlan" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Discovery questions</p>
+              <ul id="debriefQuestions" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+          </div>
+          <div class="grid gap-4 lg:grid-cols-2">
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Risks / objections</p>
+              <ul id="debriefRisks" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+            <div class="rounded-xl border border-slate-200 p-3">
+              <p class="text-xs uppercase text-slate-500">Next steps</p>
+              <ul id="debriefNextSteps" class="text-sm text-slate-700 space-y-1 list-disc list-inside"></ul>
+            </div>
+          </div>
+          <div class="rounded-xl border border-slate-200 p-3 bg-slate-50">
+            <p class="text-xs uppercase text-slate-500">Follow-up email draft</p>
+            <pre id="debriefEmail" class="text-xs whitespace-pre-wrap text-slate-700"></pre>
           </div>
         </div>
       </div>

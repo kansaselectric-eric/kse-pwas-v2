@@ -3,9 +3,15 @@ import multer from 'multer';
 import { z } from 'zod';
 import { config } from '../config.js';
 import { verifyAuthToken } from '../middleware/auth.js';
+import { getCrmState } from '../services/crmStore.js';
 
 const transcriptSchema = z.object({
   transcript: z.string().min(10)
+});
+
+const debriefRequestSchema = z.object({
+  accountId: z.string().min(1),
+  opportunityId: z.string().min(1).nullable().optional()
 });
 
 const upload = multer({
@@ -187,6 +193,255 @@ Rules:
     return res.status(500).json({ ok: false, error: message });
   }
 });
+
+aiRouter.get('/external-info', async (req, res) => {
+  const company = String(req.query.company || '').trim();
+  try {
+    const external = await fetchExternalIntel(company);
+    return res.json({ ok: true, company: company || null, ...external });
+  } catch (error) {
+    return res.json({ ok: true, company: company || null, news: [], companyInfo: {}, signals: [] });
+  }
+});
+
+aiRouter.post('/briefing', async (req, res) => {
+  try {
+    if (!config.openAi.apiKey) {
+      return res.status(500).json({ ok: false, error: 'OpenAI API key not configured' });
+    }
+    const accountName = String(req.body?.account?.name || '').trim();
+    const external = await fetchExternalIntel(accountName).catch(() => ({ news: [], signals: [], companyInfo: {} }));
+    const prompt = `Return STRICT JSON with keys:
+{
+  "overview": "",
+  "internalHighlights": [],
+  "externalHighlights": [],
+  "talkingPoints": [],
+  "risks": [],
+  "nextSteps": [],
+  "emailDraft": ""
+}
+Keep it concise and actionable.`;
+
+    const payload = {
+      model: config.openAi.model || 'gpt-4o-mini',
+      temperature: 0.2,
+      response_format: { type: 'json_object' as const },
+      messages: [
+        { role: 'system', content: prompt },
+        { role: 'user', content: JSON.stringify({ ...(req.body || { company: accountName }), external }) }
+      ]
+    };
+    const baseUrl = config.openAi.baseUrl.replace(/\/+$/, '');
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.openAi.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data) {
+      const message = data?.error?.message || `Briefing failed (status ${response.status})`;
+      return res.status(500).json({ ok: false, error: message });
+    }
+    const content = data.choices?.[0]?.message?.content;
+    const parsedJson = typeof content === 'string' ? safeJson(content) : content;
+    if (!parsedJson) return res.status(500).json({ ok: false, error: 'Briefing returned invalid JSON' });
+    return res.json(parsedJson);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Briefing failed';
+    return res.status(500).json({ ok: false, error: message });
+  }
+});
+
+aiRouter.post('/debrief', async (req, res) => {
+  try {
+    if (!config.openAi.apiKey) {
+      return res.status(500).json({ ok: false, error: 'OpenAI API key not configured' });
+    }
+    const parsed = debriefRequestSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ ok: false, error: 'accountId required' });
+    }
+    const { accountId, opportunityId } = parsed.data;
+    const state = await getCrmState();
+    const account = state.accounts.find((a: any) => a.id === accountId);
+    if (!account) return res.status(404).json({ ok: false, error: 'Account not found' });
+    const opportunity = opportunityId ? state.opportunities.find((o: any) => o.id === opportunityId) : null;
+    const external = await fetchExternalIntel(String(account.name || '')).catch(() => ({ news: [], signals: [], companyInfo: {} }));
+    const activities = state.activities
+      .filter((a: any) => a.accountId === accountId)
+      .sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+      .slice(0, 12);
+    const movements = state.movements
+      .filter((m: any) => m.accountId === accountId)
+      .sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+      .slice(0, 8);
+    const contacts = state.contacts.filter((c: any) => c.accountId === accountId).slice(0, 20);
+    const opportunities = state.opportunities.filter((o: any) => o.accountId === accountId).slice(0, 20);
+
+    const systemPrompt = `You are a senior BD strategist.
+Given the INTERNAL CRM data and OPTIONAL external signals, generate a practical debrief/gameplan for the next meeting.
+
+Return STRICT JSON:
+{
+  "currentState": "",
+  "meetingPlan": [],
+  "discoveryQuestions": [],
+  "risks": [],
+  "nextSteps": [],
+  "emailDraft": ""
+}
+
+Rules:
+- Be specific to the account/opportunity context.
+- If the opportunity is null, focus on account-level BD.
+- Do NOT invent external facts; if external is empty, keep it generic and say so implicitly.
+- Keep output short and usable (bullets).`;
+
+    const userPayload = {
+      account,
+      opportunity,
+      activities,
+      movements,
+      contacts,
+      opportunities,
+      external,
+      requestMeta: {
+        generatedAt: new Date().toISOString(),
+        requestedBy: req.authUser?.email || req.authUser?.sub || 'unknown'
+      }
+    };
+
+    const llmPayload = {
+      model: config.openAi.model || 'gpt-4o-mini',
+      temperature: 0.2,
+      response_format: { type: 'json_object' as const },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: JSON.stringify(userPayload) }
+      ]
+    };
+    const baseUrl = config.openAi.baseUrl.replace(/\/+$/, '');
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.openAi.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(llmPayload)
+    });
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data) {
+      const message = data?.error?.message || `Debrief failed (status ${response.status})`;
+      return res.status(500).json({ ok: false, error: message });
+    }
+    const content = data.choices?.[0]?.message?.content;
+    const parsedJson = typeof content === 'string' ? safeJson(content) : content;
+    if (!parsedJson) return res.status(500).json({ ok: false, error: 'Debrief returned invalid JSON' });
+    return res.json(parsedJson);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Debrief failed';
+    return res.status(500).json({ ok: false, error: message });
+  }
+});
+
+aiRouter.post('/gameplan', async (req, res) => {
+  try {
+    if (!config.openAi.apiKey) {
+      return res.status(500).json({ ok: false, error: 'OpenAI API key not configured' });
+    }
+    const startDate = String(req.body?.startDate || '');
+    const endDate = String(req.body?.endDate || '');
+    const accounts = Array.isArray(req.body?.accounts) ? req.body.accounts : [];
+    const activities = Array.isArray(req.body?.activities) ? req.body.activities : [];
+    const movements = Array.isArray(req.body?.movements) ? req.body.movements : [];
+    const opportunities = Array.isArray(req.body?.opportunities) ? req.body.opportunities : [];
+
+    const systemPrompt = `You are a senior BD manager. Create a weekly BD gameplan from CRM data.
+Return STRICT JSON:
+{
+  "headline": "",
+  "focus": "",
+  "priorities": [
+    { "accountName": "", "why": "", "nextAction": "", "when": "" }
+  ],
+  "schedule": [
+    { "day": "Mon", "blocks": [] }
+  ],
+  "risks": [],
+  "kpis": [],
+  "notes": ""
+}
+Rules:
+- Prioritize accounts with highest projected value and/or risk/stall indicators.
+- Include practical time blocks (prospecting, follow-ups, proposals, internal alignment).
+- Keep it concise and usable.`;
+
+    const baseUrl = config.openAi.baseUrl.replace(/\/+$/, '');
+    const payload = {
+      model: config.openAi.model || 'gpt-4o-mini',
+      temperature: 0.2,
+      response_format: { type: 'json_object' as const },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: JSON.stringify({ startDate, endDate, accounts, activities, movements, opportunities }) }
+      ]
+    };
+
+    const response = await fetch(`${baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${config.openAi.apiKey}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data) {
+      const message = data?.error?.message || `Gameplan failed (status ${response.status})`;
+      return res.status(500).json({ ok: false, error: message });
+    }
+    const content = data.choices?.[0]?.message?.content;
+    const parsedJson = typeof content === 'string' ? safeJson(content) : content;
+    if (!parsedJson) return res.status(500).json({ ok: false, error: 'Gameplan returned invalid JSON' });
+    return res.json({ ok: true, plan: parsedJson });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Gameplan failed';
+    return res.status(500).json({ ok: false, error: message });
+  }
+});
+
+async function fetchExternalIntel(company: string) {
+  if (!company) return { news: [], companyInfo: {}, signals: [] };
+  const news = await fetchGdeltNews(company).catch(() => []);
+  const signals: string[] = [];
+  if (news.length) signals.push(`Recent news mentions: ${news.length}`);
+  if (/city of|county|usd\s?\d|public works/i.test(company)) signals.push('Public-sector entity likely — check procurement/capital plans');
+  return {
+    news,
+    companyInfo: {},
+    signals
+  };
+}
+
+async function fetchGdeltNews(query: string) {
+  const url = `https://api.gdeltproject.org/api/v2/doc/doc?query=${encodeURIComponent(query)}&mode=ArtList&format=json&maxrecords=6&sort=hybridrel`;
+  const response = await fetch(url, { headers: { 'User-Agent': 'kse-tools-server' } as any });
+  if (!response.ok) return [];
+  const data: any = await response.json().catch(() => null);
+  const articles = data?.articles || [];
+  return articles.slice(0, 6).map((a: any) => ({
+    title: a.title || '',
+    url: a.url || '',
+    source: a.sourceCountry || a.source || '',
+    publishedAt: a.seendate || a.datetime || '',
+    snippet: a.snippet || ''
+  }));
+}
 
 function normalizeExtraction(payload: any) {
   // If model returns legacy flat keys, wrap into new schema.

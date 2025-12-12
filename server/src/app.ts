@@ -15,6 +15,7 @@ import { marketRouter } from './routes/market.js';
 import { marketingRouter } from './routes/marketing.js';
 import { opportunitiesRouter } from './routes/opportunities.js';
 import { nexusRouter } from './routes/nexus.js';
+import { cipRouter } from './routes/cip.js';
 import { initSentry, Sentry } from './sentry.js';
 import { config } from './config.js';
 
@@ -60,6 +61,7 @@ app.use('/api/market', marketRouter);
 app.use('/api/marketing', marketingRouter);
 app.use('/api/opportunities', opportunitiesRouter);
 app.use('/api/nexus', nexusRouter);
+app.use('/api/cip', cipRouter);
 
 app.get('/', (_req, res) => {
   res.json({ ok: true, service: 'kse-tools-server' });

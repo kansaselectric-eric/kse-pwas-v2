@@ -116,3 +116,30 @@ model Opportunity {
   projectLocationAccuracy String?
   lastStageChange         String?
 }
+
+model CapitalPlanItem {
+  id          String @id
+  hash        String? @unique
+  source      String
+  sourceType  String?
+  agency      String?
+  title       String
+  summary     String?
+  url         String?
+  docUrl      String?
+  city        String?
+  state       String?
+  county      String?
+  latitude    Float?
+  longitude   Float?
+  fiscalYear  String?
+  budget      Float?
+  status      String?
+  stage       String?
+  tags        Json?
+  publishedAt String?
+  scrapedAt   String?
+  createdAt   String?
+  updatedAt   String?
+  raw         Json?
+}

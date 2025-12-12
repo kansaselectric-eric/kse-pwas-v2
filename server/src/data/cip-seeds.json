@@ -1,0 +1,26 @@
+[
+  {
+    "name": "Kansas DOT STIP (seed placeholder)",
+    "type": "state",
+    "url": "https://www.ksdot.gov/bureaus/burtransplan/stip.asp",
+    "tags": ["Kansas", "transportation", "CIP"],
+    "state": "KS"
+  },
+  {
+    "name": "City of Wichita (search for CIP PDF links)",
+    "type": "municipal",
+    "url": "https://www.wichita.gov/",
+    "tags": ["Kansas", "Wichita", "CIP"],
+    "city": "Wichita",
+    "state": "KS"
+  },
+  {
+    "name": "City of Overland Park (search for CIP links)",
+    "type": "municipal",
+    "url": "https://www.opkansas.org/",
+    "tags": ["Kansas", "Overland Park", "CIP"],
+    "city": "Overland Park",
+    "state": "KS"
+  }
+]
+

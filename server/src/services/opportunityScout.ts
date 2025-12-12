@@ -7,6 +7,8 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { config } from '../config.js';
 import { logger } from '../logger.js';
+import { prisma } from './db.js';
+import { NEWTON_KS, haversineMiles } from './cipIntel.js';
 
 const SEED_LOCATIONS = [
   fileURLToPath(new URL('../data/opportunity-seeds.json', import.meta.url)),
@@ -138,6 +140,7 @@ async function hydrateSources(keywords: string[]) {
   const pipelines: Array<{ name: string; loader: () => Promise<OpportunityRecord[]> }> = [
     { name: 'SAM.gov', loader: () => fetchSamGov(keywords) },
     { name: 'Kansas Procurement', loader: () => fetchKansasProcurement() },
+    { name: 'Kansas Capital Plans', loader: () => fetchKansasCapitalPlans() },
     { name: 'Expansion Signals', loader: () => fetchExpansionNews(keywords) },
     { name: 'Energy.gov OE', loader: () => fetchEnergyOfficeAnnouncements() },
     { name: 'Utility Dive', loader: () => fetchUtilityDiveSignals() },
@@ -179,6 +182,48 @@ async function hydrateSources(keywords: string[]) {
   cache.sources = sources;
   cache.fetchedAt = now;
   return { items: deduped, sources };
+}
+
+async function fetchKansasCapitalPlans(): Promise<OpportunityRecord[]> {
+  // Read-only: convert stored CapitalPlanItem rows into Opportunity Scout items.
+  // These are early-stage signals (often pre-bid) so we classify as 'expansion'.
+  try {
+    const items = await prisma.capitalPlanItem.findMany({
+      where: { state: 'KS' },
+      orderBy: [{ publishedAt: 'desc' }, { scrapedAt: 'desc' }],
+      take: 40
+    });
+    const within120 = items.filter((item: any) => {
+      if (typeof item.latitude !== 'number' || typeof item.longitude !== 'number') return true; // keep if unknown
+      return haversineMiles(NEWTON_KS.lat, NEWTON_KS.lng, item.latitude, item.longitude) <= 120;
+    });
+    return within120.map((item: any) => {
+      const location = [item.city, item.state].filter(Boolean).join(', ') || 'KS';
+      const value = typeof item.budget === 'number' ? item.budget : null;
+      const tags = Array.isArray(item.tags) ? item.tags : item.tags ? [String(item.tags)] : [];
+      const confidence = item.sourceType === 'signal' ? 68 : 78;
+      const score = Math.min(95, confidence + (value ? 10 : 0));
+      return {
+        id: item.id,
+        title: item.title,
+        summary: item.summary || 'Capital plan / CIP signal',
+        source: item.source || 'Capital Plans',
+        url: item.docUrl || item.url || '',
+        type: 'expansion',
+        agency: item.agency || undefined,
+        location,
+        postedDate: item.publishedAt || item.scrapedAt || undefined,
+        dueDate: undefined,
+        value,
+        tags: ['CIP', 'Kansas', ...tags].slice(0, 12),
+        confidence,
+        score
+      } satisfies OpportunityRecord;
+    });
+  } catch (error) {
+    logger.warn({ error }, 'Kansas Capital Plans source failed');
+    return [];
+  }
 }
 
 function applyFilters(items: OpportunityRecord[], filters: OpportunityFilters, keywords: string[]) {

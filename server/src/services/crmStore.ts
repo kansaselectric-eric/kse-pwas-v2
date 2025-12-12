@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './db.js';
 
 type GenericRecord = Record<string, unknown>;
 
@@ -10,8 +10,6 @@ export type CrmState = {
   movements: GenericRecord[];
   opportunities: GenericRecord[];
 };
-
-const prisma = new PrismaClient();
 
 function ensureId(record: GenericRecord, prefix: string) {
   if (!record.id) {
