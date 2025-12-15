@@ -291,7 +291,8 @@ function handleOpportunityAction(event) {
 }
 
 function sendToEstimator(item) {
-  const estimatorUrl = new URL('../estimate-accelerator/web/index.html', window.location.href);
+  // Use absolute path so it works regardless of current app URL depth.
+  const estimatorUrl = new URL('/estimate-accelerator/web/index.html', window.location.origin);
   estimatorUrl.searchParams.set('rfpTitle', item.title || '');
   if (item.summary) estimatorUrl.searchParams.set('rfpSummary', item.summary);
   if (item.url) estimatorUrl.searchParams.set('rfpUrl', item.url);

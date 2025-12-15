@@ -32,8 +32,8 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(request, copy)).catch(() => {});
           return response;
         })
-        .catch(() => cached);
-      return cached || fetchPromise;
+        .catch(() => cached || Response.error());
+      return cached || fetchPromise || Response.error();
     })
   );
 });
