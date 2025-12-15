@@ -3066,20 +3066,39 @@ function downloadWeeklySummaryCsv() {
   downloadCsv('ecd-weekly-summary', headers, rows);
 }
 
+function normalizeStageValue(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function isProspectStageValue(value) {
+  return normalizeStageValue(value) === 'prospect';
+}
+
+function getProspectAccountIdSet() {
+  return new Set(state.accounts.filter((acc) => isProspectStageValue(acc.stage)).map((acc) => acc.id));
+}
+
 function filterAccountsByRange(range) {
-  return state.accounts.filter((acc) => withinRange(acc.updatedAt || acc.createdAt, range));
+  return state.accounts.filter(
+    (acc) => !isProspectStageValue(acc.stage) && withinRange(acc.updatedAt || acc.createdAt, range)
+  );
 }
 
 function filterMovementsByRange(range) {
-  return state.movements.filter((move) => withinRange(move.date, range));
+  const prospectIds = getProspectAccountIdSet();
+  return state.movements.filter((move) => !prospectIds.has(move.accountId) && withinRange(move.date, range));
 }
 
 function filterOpportunitiesByRange(range) {
-  return state.opportunities.filter((opp) => withinRange(opp.updatedAt || opp.createdAt, range));
+  const prospectIds = getProspectAccountIdSet();
+  return state.opportunities.filter(
+    (opp) => !prospectIds.has(opp.accountId) && withinRange(opp.updatedAt || opp.createdAt, range)
+  );
 }
 
 function filterActivitiesByRange(range) {
-  return state.activities.filter((act) => withinRange(act.date, range));
+  const prospectIds = getProspectAccountIdSet();
+  return state.activities.filter((act) => !prospectIds.has(act.accountId) && withinRange(act.date, range));
 }
 
 function exportPipelineCsv(range) {
