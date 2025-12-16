@@ -937,7 +937,7 @@ async function extractDocumentText(file, summary = state.fileSummary) {
 
   if (kind === 'PDF') {
     if (mode === 'ocr') {
-      return await requestDocumentAi(file, summary);
+      return await requestOcrOrFallback(file, summary, null);
     }
 
     const pdfText = await extractPdfText(file, summary);
@@ -948,16 +948,16 @@ async function extractDocumentText(file, summary = state.fileSummary) {
 
     // Auto mode: if the PDF looks scanned / empty, fall back to OCR.
     noteFileWarning('PDF appears to be image-based; running OCR fallback.', summary);
-    return await requestDocumentAi(file, summary);
+    return await requestOcrOrFallback(file, summary, pdfText);
   }
 
   // Images (and anything else): use OCR endpoint (OpenAI Vision) as before.
   if (isImageFile(file) || mode === 'ocr') {
-    return await requestDocumentAi(file, summary);
+    return await requestOcrOrFallback(file, summary, null);
   }
 
   // Last resort: try OCR endpoint even for unknown types.
-  return await requestDocumentAi(file, summary);
+  return await requestOcrOrFallback(file, summary, null);
 }
 
 async function extractPdfText(file, summary = state.fileSummary) {
@@ -1003,6 +1003,22 @@ async function extractPdfText(file, summary = state.fileSummary) {
 
 // NOTE: We intentionally do not run client-side OCR (e.g. Tesseract) in this app.
 // For scanned PDFs and images we rely on the server OCR endpoint.
+
+async function requestOcrOrFallback(file, summary = state.fileSummary, fallbackResult = null) {
+  try {
+    return await requestDocumentAi(file, summary);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    noteFileWarning(`OCR failed: ${message}`, summary);
+    // If we have any fallback text (e.g., pdf.js extracted partial text), use it instead of failing ingest.
+    if (fallbackResult && (fallbackResult.text || fallbackResult.pageTexts?.length)) {
+      setFilePipeline('OCR failed; using extracted PDF text', summary);
+      return fallbackResult;
+    }
+    // No fallback available (e.g., images) — rethrow to show user a meaningful error.
+    throw error;
+  }
+}
 
 async function requestDocumentAi(file, summary = state.fileSummary) {
   const sizeMb = Number(file.size || 0) / (1024 * 1024);
