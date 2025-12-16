@@ -1,0 +1,6 @@
+[build]
+  publish = "estimate-accelerator/web"
+  command = ""
+
+# Estimate Accelerator is a static site. We keep this config on the
+# estimate-accelerator-deploy branch to avoid impacting CRM deploys.
