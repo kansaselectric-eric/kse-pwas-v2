@@ -861,13 +861,20 @@ async function ingestSingleFile(file, summary) {
   setOcrProgress(0);
   try {
     updateFileStep('Text extraction', 'Detecting file type', summary);
-    const docAi = await requestDocumentAi(file, summary);
-    summary.pageTexts = docAi.pageTexts || [];
-    summary.pages = docAi.pages || summary.pageTexts.length || null;
-    appendFileText(summary, docAi.text || '', summary.pageTexts);
+    const extracted = await extractDocumentText(file, summary);
+    summary.pageTexts = extracted.pageTexts || [];
+    summary.pages = extracted.pages || summary.pageTexts.length || null;
+    appendFileText(summary, extracted.text || '', summary.pageTexts);
     summary.status = 'Complete';
     updateFileStep('Text extraction', 'Completed', summary);
-    updateFileSummary({ characterCount: (docAi.text || '').length, pages: docAi.pages || null }, summary);
+    updateFileSummary(
+      {
+        characterCount: (extracted.text || '').length,
+        pages: extracted.pages || null,
+        ocrConfidence: extracted.confidence ?? summary.ocrConfidence ?? null
+      },
+      summary
+    );
   } catch (err) {
     summary.status = 'Error';
     console.error(`Failed to ingest ${summary.name}`, err);
@@ -901,6 +908,154 @@ function appendFileText(summary, text, pageTexts = []) {
 
 
 
+async function extractDocumentText(file, summary = state.fileSummary) {
+  const mode = summary?.mode || state.processingMode || 'auto';
+  const kind = detectFileKind(file);
+
+  if (kind === 'Text' && mode !== 'ocr') {
+    setFilePipeline('Reading text file', summary);
+    setOcrStatus('Reading text…');
+    setOcrProgress(0.25);
+    const text = await file.text();
+    setOcrProgress(1);
+    return { text, pages: 1, confidence: null, pageTexts: [text] };
+  }
+
+  if (kind === 'DOCX' && mode !== 'ocr') {
+    setFilePipeline('Extracting DOCX text', summary);
+    setOcrStatus('Extracting DOCX…');
+    setOcrProgress(0.15);
+    const arrayBuffer = await file.arrayBuffer();
+    if (!window.mammoth?.extractRawText) {
+      throw new Error('DOCX parser not available (mammoth).');
+    }
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    const text = result?.value || '';
+    setOcrProgress(1);
+    return { text, pages: 1, confidence: null, pageTexts: [text] };
+  }
+
+  if (kind === 'PDF') {
+    if (mode === 'ocr') {
+      return await ocrPdfWithFallback(file, summary);
+    }
+
+    const pdfText = await extractPdfText(file, summary);
+    const meaningful = (pdfText.text || '').replace(/\s+/g, ' ').trim().length >= 80;
+    if (meaningful || mode === 'text') {
+      return pdfText;
+    }
+
+    // Auto mode: if the PDF looks scanned / empty, fall back to OCR.
+    noteFileWarning('PDF appears to be image-based; running OCR fallback.', summary);
+    return await ocrPdfWithFallback(file, summary);
+  }
+
+  // Images (and anything else): use OCR endpoint (OpenAI Vision) as before.
+  if (isImageFile(file) || mode === 'ocr') {
+    return await requestDocumentAi(file, summary);
+  }
+
+  // Last resort: try OCR endpoint even for unknown types.
+  return await requestDocumentAi(file, summary);
+}
+
+async function extractPdfText(file, summary = state.fileSummary) {
+  const pdfjs = window.pdfjsLib;
+  if (!pdfjs?.getDocument) {
+    throw new Error('PDF parser not available (pdf.js).');
+  }
+  // Ensure worker is loaded from CDN (Netlify won’t have a local pdf.worker.js).
+  try {
+    const workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+    }
+  } catch {
+    // ignore worker configuration errors
+  }
+
+  setFilePipeline('Extracting PDF text', summary);
+  setOcrStatus('Reading PDF text…');
+  setOcrProgress(0.05);
+  const data = await file.arrayBuffer();
+  const doc = await pdfjs.getDocument({ data }).promise;
+  const totalPages = Number(doc.numPages || 0) || 0;
+  const pageTexts = [];
+  for (let i = 1; i <= totalPages; i += 1) {
+    setOcrStatus(`Reading PDF text… (page ${i}/${totalPages})`);
+    setOcrProgress(totalPages ? 0.05 + (i / totalPages) * 0.75 : 0.5);
+    const page = await doc.getPage(i);
+    const content = await page.getTextContent();
+    const items = Array.isArray(content?.items) ? content.items : [];
+    const raw = items
+      .map((it) => (typeof it?.str === 'string' ? it.str : ''))
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    pageTexts.push(raw);
+  }
+  const text = pageTexts.filter((t) => t && t.trim().length).join('\n\n');
+  setOcrProgress(1);
+  return { text, pages: totalPages || null, confidence: null, pageTexts };
+}
+
+async function ocrPdfWithFallback(file, summary = state.fileSummary) {
+  // Prefer local Tesseract OCR if available (no API cost), else fall back to server OCR.
+  if (window.Tesseract?.recognize) {
+    return await ocrPdfWithTesseract(file, summary);
+  }
+  // Fallback: send PDF to OCR endpoint (works if backend/OpenAI accepts PDFs).
+  return await requestDocumentAi(file, summary);
+}
+
+async function ocrPdfWithTesseract(file, summary = state.fileSummary) {
+  const pdfjs = window.pdfjsLib;
+  if (!pdfjs?.getDocument) {
+    throw new Error('PDF parser not available (pdf.js).');
+  }
+  const workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+  }
+
+  const data = await file.arrayBuffer();
+  const doc = await pdfjs.getDocument({ data }).promise;
+  const totalPages = Number(doc.numPages || 0) || 0;
+  const maxPages = Math.min(totalPages || 0, 8);
+  if (totalPages > maxPages) {
+    noteFileWarning(`OCR fallback limited to first ${maxPages} pages for speed.`, summary);
+  }
+  setFilePipeline('OCR (PDF → image pages)', summary);
+  const pageTexts = [];
+  for (let i = 1; i <= maxPages; i += 1) {
+    setOcrStatus(`OCR scanning… (page ${i}/${maxPages})`);
+    setOcrProgress(maxPages ? (i - 1) / maxPages : 0);
+    const page = await doc.getPage(i);
+    const viewport = page.getViewport({ scale: 1.4 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    await page.render({ canvasContext: ctx, viewport }).promise;
+    const result = await window.Tesseract.recognize(canvas, 'eng', {
+      logger: (m) => {
+        if (typeof m?.progress === 'number') {
+          const base = (i - 1) / maxPages;
+          const step = 1 / maxPages;
+          setOcrProgress(Math.min(0.99, base + step * m.progress));
+        }
+      }
+    });
+    const text = result?.data?.text ? String(result.data.text) : '';
+    pageTexts.push(text.trim());
+  }
+  const text = pageTexts.filter(Boolean).join('\n\n');
+  setOcrProgress(1);
+  return { text, pages: maxPages || null, confidence: null, pageTexts };
+}
+
 async function requestDocumentAi(file, summary = state.fileSummary) {
   const sizeMb = Number(file.size || 0) / (1024 * 1024);
   if (sizeMb > 20) {
@@ -913,12 +1068,13 @@ async function requestDocumentAi(file, summary = state.fileSummary) {
   setFilePipeline('Processing via OpenAI Vision', summary);
   setOcrStatus('Processing with OpenAI Vision…');
   setOcrProgress(0.35);
+  const mimeType = guessMimeType(file);
   const res = await fetch(CLOUD_OCR_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fileBase64: base64,
-      mimeType: file.type || 'application/pdf'
+      mimeType
     })
   });
   const data = await res.json().catch(() => null);
@@ -938,6 +1094,20 @@ async function requestDocumentAi(file, summary = state.fileSummary) {
     confidence: data.confidence ?? null,
     pageTexts: Array.isArray(data.pageTexts) ? data.pageTexts : []
   };
+}
+
+function guessMimeType(file) {
+  const type = String(file?.type || '').toLowerCase().trim();
+  if (type) return type;
+  const name = String(file?.name || '').toLowerCase();
+  if (name.endsWith('.pdf')) return 'application/pdf';
+  if (name.endsWith('.docx')) {
+    return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  }
+  if (name.endsWith('.txt')) return 'text/plain';
+  if (name.endsWith('.png')) return 'image/png';
+  if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
+  return 'application/octet-stream';
 }
 
 
