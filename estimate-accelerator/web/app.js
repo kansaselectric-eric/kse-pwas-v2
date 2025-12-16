@@ -936,19 +936,15 @@ async function extractDocumentText(file, summary = state.fileSummary) {
   }
 
   if (kind === 'PDF') {
-    if (mode === 'ocr') {
-      return await requestOcrOrFallback(file, summary, null);
-    }
-
     const pdfText = await extractPdfText(file, summary);
     const meaningful = (pdfText.text || '').replace(/\s+/g, ' ').trim().length >= 80;
     if (meaningful || mode === 'text') {
       return pdfText;
     }
 
-    // Auto mode: if the PDF looks scanned / empty, fall back to OCR.
-    noteFileWarning('PDF appears to be image-based; running OCR fallback.', summary);
-    return await requestOcrOrFallback(file, summary, pdfText);
+    // If we reach here, the PDF likely needs OCR (scanned / image-based) OR the user forced OCR mode.
+    noteFileWarning('PDF appears to be image-based; running OCR on rendered pages.', summary);
+    return await requestPdfOcrOrFallback(file, summary, pdfText);
   }
 
   // Images (and anything else): use OCR endpoint (OpenAI Vision) as before.
@@ -1003,6 +999,94 @@ async function extractPdfText(file, summary = state.fileSummary) {
 
 // NOTE: We intentionally do not run client-side OCR (e.g. Tesseract) in this app.
 // For scanned PDFs and images we rely on the server OCR endpoint.
+
+async function requestPdfOcrOrFallback(file, summary = state.fileSummary, fallbackResult = null) {
+  try {
+    return await requestPdfOcrAsImages(file, summary);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    noteFileWarning(`PDF OCR failed: ${message}`, summary);
+    if (fallbackResult && (fallbackResult.text || fallbackResult.pageTexts?.length)) {
+      setFilePipeline('PDF OCR failed; using extracted PDF text', summary);
+      return fallbackResult;
+    }
+    throw error;
+  }
+}
+
+async function requestPdfOcrAsImages(file, summary = state.fileSummary) {
+  const pdfjs = window.pdfjsLib;
+  if (!pdfjs?.getDocument) {
+    throw new Error('PDF parser not available (pdf.js).');
+  }
+  // Ensure worker is loaded from CDN.
+  try {
+    const workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
+      pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+    }
+  } catch {
+    // ignore worker configuration errors
+  }
+
+  setFilePipeline('OCR PDF pages (render → image)', summary);
+  setOcrStatus('Preparing PDF for OCR…');
+  setOcrProgress(0.05);
+
+  const data = await file.arrayBuffer();
+  const doc = await pdfjs.getDocument({ data }).promise;
+  const totalPages = Number(doc.numPages || 0) || 0;
+  const maxPages = Math.min(totalPages || 0, 6);
+  if (totalPages > maxPages) {
+    noteFileWarning(`OCR limited to first ${maxPages} pages for speed.`, summary);
+  }
+
+  const pageTexts = [];
+  for (let i = 1; i <= maxPages; i += 1) {
+    setOcrStatus(`OCR scanning… (page ${i}/${maxPages})`);
+    setOcrProgress(maxPages ? 0.1 + (i - 1) / maxPages * 0.7 : 0.45);
+
+    const page = await doc.getPage(i);
+    // Higher scale helps small fonts; keep modest to avoid huge payloads.
+    const viewport = page.getViewport({ scale: 1.7 });
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.ceil(viewport.width);
+    canvas.height = Math.ceil(viewport.height);
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    await page.render({ canvasContext: ctx, viewport }).promise;
+
+    // Convert to JPEG base64 to keep payload size down.
+    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
+    const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    if (!base64) {
+      throw new Error('Failed to rasterize PDF page for OCR.');
+    }
+
+    const res = await fetch(CLOUD_OCR_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        fileBase64: base64,
+        mimeType: 'image/jpeg'
+      })
+    });
+    const payload = await res.json().catch(() => null);
+    if (!res.ok || !payload?.ok) {
+      const msg = payload?.error || `OCR endpoint failed (status ${res.status})`;
+      throw new Error(msg);
+    }
+    const text = String(payload.text || '').trim();
+    pageTexts.push(text);
+  }
+
+  setOcrProgress(1);
+  return {
+    text: pageTexts.filter(Boolean).join('\n\n'),
+    pages: maxPages || null,
+    confidence: null,
+    pageTexts
+  };
+}
 
 async function requestOcrOrFallback(file, summary = state.fileSummary, fallbackResult = null) {
   try {
