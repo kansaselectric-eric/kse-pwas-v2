@@ -65,16 +65,31 @@ function buildTakeoff(raw, dict = {}) {
       };
       continue;
     }
-    const qtyMatch = line.match(/(?:^|\s)(?:qty|quantity|q\/ty|q:|#)?\s*(\d{1,6}(?:\.\d{1,2})?)/i);
+    if (isProbablyNoiseLine(line)) continue;
+
+    // IMPORTANT: OCR text can contain tons of random numbers. We only treat a line
+    // as a take-off candidate if it has at least one "anchor":
+    // - an explicit qty/quantity marker, OR
+    // - a recognized unit token, OR
+    // - a dictionary/category keyword hit.
+    const qtyMatch = line.match(/(?:^|\s)(\d{1,6}(?:\.\d{1,2})?)\b/);
     if (!qtyMatch) continue;
     const quantity = Number(qtyMatch[1]);
     if (!Number.isFinite(quantity) || quantity <= 0) continue;
+
+    const hasQtyLabel = /\b(qty|quantity|q\/ty|q:|#)\b/i.test(line);
     const unitMatch = line.match(/\b(lf|lf\.|sf|sf\.|ea|each|unit|set|sets|pair|pairs|lot|hr|hrs|hour|hours|day|days|ft|feet|panel|panels|circuit|circuits|fixture|fixtures|floor|floors|zone|zones)\b/i);
     const unit = normalizeUnit(unitMatch?.[1]);
+
     const description = cleanupDescription(line, qtyMatch[0], unitMatch?.[0]);
-    if (!description || description.length < 3) continue;
-    const category = categorizeDescription(description, dict);
+    if (!description || description.length < 8) continue;
+
     const keywords = matchKeywords(description, dict);
+    const category = categorizeDescription(description, dict);
+    const hasCategoryKeyword = category !== 'general';
+    const hasAnchor = hasQtyLabel || Boolean(unitMatch) || keywords.length > 0 || hasCategoryKeyword;
+    if (!hasAnchor) continue;
+
     const complexity = computeComplexity(description);
     const priorityScore = computePriority(quantity, keywords.length, complexity);
     items.push({
@@ -92,6 +107,21 @@ function buildTakeoff(raw, dict = {}) {
     });
   }
   return consolidateItems(items);
+}
+
+function isProbablyNoiseLine(line) {
+  const s = String(line || '').trim();
+  if (!s) return true;
+  // skip page separators / obvious OCR debris
+  if (/^[-=_•\s]+$/.test(s)) return true;
+  // require enough letters to be meaningful (filters "5 ]", "===", etc.)
+  const letters = (s.match(/[A-Za-z]/g) || []).length;
+  const digits = (s.match(/[0-9]/g) || []).length;
+  const symbols = (s.match(/[^A-Za-z0-9\s]/g) || []).length;
+  const total = Math.max(1, letters + digits + symbols);
+  if (letters < 4) return true;
+  if (symbols / total > 0.45) return true;
+  return false;
 }
 
 function cleanupDescription(line, qtySlice, unitSlice) {

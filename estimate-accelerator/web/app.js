@@ -1002,12 +1002,20 @@ async function extractPdfText(file, summary = state.fileSummary) {
 }
 
 async function ocrPdfWithFallback(file, summary = state.fileSummary) {
-  // Prefer local Tesseract OCR if available (no API cost), else fall back to server OCR.
-  if (window.Tesseract?.recognize) {
-    return await ocrPdfWithTesseract(file, summary);
+  // For scanned PDFs, local Tesseract often produces noisy text (gibberish).
+  // Prefer the server OCR endpoint first (typically higher quality), then fall back to Tesseract.
+  try {
+    return await requestDocumentAi(file, summary);
+  } catch (error) {
+    noteFileWarning(
+      `Cloud OCR failed; falling back to local OCR. (${error instanceof Error ? error.message : 'unknown error'})`,
+      summary
+    );
+    if (window.Tesseract?.recognize) {
+      return await ocrPdfWithTesseract(file, summary);
+    }
+    throw error;
   }
-  // Fallback: send PDF to OCR endpoint (works if backend/OpenAI accepts PDFs).
-  return await requestDocumentAi(file, summary);
 }
 
 async function ocrPdfWithTesseract(file, summary = state.fileSummary) {
@@ -1033,7 +1041,8 @@ async function ocrPdfWithTesseract(file, summary = state.fileSummary) {
     setOcrStatus(`OCR scanning… (page ${i}/${maxPages})`);
     setOcrProgress(maxPages ? (i - 1) / maxPages : 0);
     const page = await doc.getPage(i);
-    const viewport = page.getViewport({ scale: 1.4 });
+    // Higher scale materially improves OCR accuracy on small fonts.
+    const viewport = page.getViewport({ scale: 2.0 });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
