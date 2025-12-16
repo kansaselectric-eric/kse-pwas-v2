@@ -363,20 +363,41 @@ function handleAnalyzeClick() {
   const dict = dictionariesFromCurrent();
   saveDictionaries();
   try {
-    const worker = new Worker('parser-worker.js');
-    worker.onmessage = (ev) => {
-      worker.terminate();
-      handleAnalysisResult(ev.data || {}, text, dict);
-    };
-    worker.onerror = () => {
-      worker.terminate();
-      fallbackAnalysis(text, dict);
-    };
-    worker.postMessage({ text, dict });
+    // Highest-quality path: use server-side extraction (LLM) when available.
+    requestServerTakeoff(text, dict)
+      .then((data) => {
+        if (data?.ok) {
+          handleAnalysisResult(data, text, dict);
+          return;
+        }
+        throw new Error(data?.error || 'Server takeoff unavailable');
+      })
+      .catch(() => {
+        // Fallback: local worker heuristics.
+        const worker = new Worker('parser-worker.js');
+        worker.onmessage = (ev) => {
+          worker.terminate();
+          handleAnalysisResult(ev.data || {}, text, dict);
+        };
+        worker.onerror = () => {
+          worker.terminate();
+          fallbackAnalysis(text, dict);
+        };
+        worker.postMessage({ text, dict });
+      });
   } catch (err) {
     console.error('Worker failed, using fallback', err);
     fallbackAnalysis(text, dict);
   }
+}
+
+async function requestServerTakeoff(text, dict) {
+  const res = await fetch('/api/estimate/takeoff', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text, dict })
+  });
+  return await res.json().catch(() => ({ ok: false, error: `Server responded ${res.status}` }));
 }
 
 function handleAnalysisResult(res, sourceText, dict) {
@@ -1036,9 +1057,12 @@ async function requestPdfOcrAsImages(file, summary = state.fileSummary) {
   const data = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data }).promise;
   const totalPages = Number(doc.numPages || 0) || 0;
-  const maxPages = Math.min(totalPages || 0, 6);
-  if (totalPages > maxPages) {
-    noteFileWarning(`OCR limited to first ${maxPages} pages for speed.`, summary);
+  // Highest-quality mode: attempt as many pages as possible.
+  // Safety cap to avoid infinite runtimes on huge plan sets.
+  const hardCap = 40;
+  const maxPages = Math.min(totalPages || 0, hardCap);
+  if (totalPages > hardCap) {
+    noteFileWarning(`PDF is ${totalPages} pages; OCR capped to first ${hardCap} pages.`, summary);
   }
 
   const pageTexts = [];
@@ -1047,8 +1071,10 @@ async function requestPdfOcrAsImages(file, summary = state.fileSummary) {
     setOcrProgress(maxPages ? 0.1 + (i - 1) / maxPages * 0.7 : 0.45);
 
     const page = await doc.getPage(i);
-    // Higher scale helps small fonts; keep modest to avoid huge payloads.
-    const viewport = page.getViewport({ scale: 1.7 });
+    // Higher scale improves OCR quality materially.
+    let scale = 2.3;
+    let jpegQuality = 0.9;
+    let viewport = page.getViewport({ scale });
     const canvas = document.createElement('canvas');
     canvas.width = Math.ceil(viewport.width);
     canvas.height = Math.ceil(viewport.height);
@@ -1056,8 +1082,25 @@ async function requestPdfOcrAsImages(file, summary = state.fileSummary) {
     await page.render({ canvasContext: ctx, viewport }).promise;
 
     // Convert to JPEG base64 to keep payload size down.
-    const dataUrl = canvas.toDataURL('image/jpeg', 0.82);
-    const base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    let dataUrl = canvas.toDataURL('image/jpeg', jpegQuality);
+    let base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    // If the payload is too large, downshift quality (and if needed, re-render at lower scale).
+    const maxBase64Chars = 18_000_000; // ~13.5MB binary
+    if (base64 && base64.length > maxBase64Chars) {
+      jpegQuality = 0.75;
+      dataUrl = canvas.toDataURL('image/jpeg', jpegQuality);
+      base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    }
+    if (base64 && base64.length > maxBase64Chars) {
+      // re-render at a lower scale
+      scale = 1.8;
+      viewport = page.getViewport({ scale });
+      canvas.width = Math.ceil(viewport.width);
+      canvas.height = Math.ceil(viewport.height);
+      await page.render({ canvasContext: ctx, viewport }).promise;
+      dataUrl = canvas.toDataURL('image/jpeg', jpegQuality);
+      base64 = dataUrl.includes(',') ? dataUrl.split(',')[1] : '';
+    }
     if (!base64) {
       throw new Error('Failed to rasterize PDF page for OCR.');
     }
