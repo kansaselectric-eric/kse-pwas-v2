@@ -937,7 +937,7 @@ async function extractDocumentText(file, summary = state.fileSummary) {
 
   if (kind === 'PDF') {
     if (mode === 'ocr') {
-      return await ocrPdfWithFallback(file, summary);
+      return await requestDocumentAi(file, summary);
     }
 
     const pdfText = await extractPdfText(file, summary);
@@ -948,7 +948,7 @@ async function extractDocumentText(file, summary = state.fileSummary) {
 
     // Auto mode: if the PDF looks scanned / empty, fall back to OCR.
     noteFileWarning('PDF appears to be image-based; running OCR fallback.', summary);
-    return await ocrPdfWithFallback(file, summary);
+    return await requestDocumentAi(file, summary);
   }
 
   // Images (and anything else): use OCR endpoint (OpenAI Vision) as before.
@@ -1001,69 +1001,8 @@ async function extractPdfText(file, summary = state.fileSummary) {
   return { text, pages: totalPages || null, confidence: null, pageTexts };
 }
 
-async function ocrPdfWithFallback(file, summary = state.fileSummary) {
-  // For scanned PDFs, local Tesseract often produces noisy text (gibberish).
-  // Prefer the server OCR endpoint first (typically higher quality), then fall back to Tesseract.
-  try {
-    return await requestDocumentAi(file, summary);
-  } catch (error) {
-    noteFileWarning(
-      `Cloud OCR failed; falling back to local OCR. (${error instanceof Error ? error.message : 'unknown error'})`,
-      summary
-    );
-    if (window.Tesseract?.recognize) {
-      return await ocrPdfWithTesseract(file, summary);
-    }
-    throw error;
-  }
-}
-
-async function ocrPdfWithTesseract(file, summary = state.fileSummary) {
-  const pdfjs = window.pdfjsLib;
-  if (!pdfjs?.getDocument) {
-    throw new Error('PDF parser not available (pdf.js).');
-  }
-  const workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-  if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
-    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
-  }
-
-  const data = await file.arrayBuffer();
-  const doc = await pdfjs.getDocument({ data }).promise;
-  const totalPages = Number(doc.numPages || 0) || 0;
-  const maxPages = Math.min(totalPages || 0, 8);
-  if (totalPages > maxPages) {
-    noteFileWarning(`OCR fallback limited to first ${maxPages} pages for speed.`, summary);
-  }
-  setFilePipeline('OCR (PDF → image pages)', summary);
-  const pageTexts = [];
-  for (let i = 1; i <= maxPages; i += 1) {
-    setOcrStatus(`OCR scanning… (page ${i}/${maxPages})`);
-    setOcrProgress(maxPages ? (i - 1) / maxPages : 0);
-    const page = await doc.getPage(i);
-    // Higher scale materially improves OCR accuracy on small fonts.
-    const viewport = page.getViewport({ scale: 2.0 });
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.ceil(viewport.width);
-    canvas.height = Math.ceil(viewport.height);
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    await page.render({ canvasContext: ctx, viewport }).promise;
-    const result = await window.Tesseract.recognize(canvas, 'eng', {
-      logger: (m) => {
-        if (typeof m?.progress === 'number') {
-          const base = (i - 1) / maxPages;
-          const step = 1 / maxPages;
-          setOcrProgress(Math.min(0.99, base + step * m.progress));
-        }
-      }
-    });
-    const text = result?.data?.text ? String(result.data.text) : '';
-    pageTexts.push(text.trim());
-  }
-  const text = pageTexts.filter(Boolean).join('\n\n');
-  setOcrProgress(1);
-  return { text, pages: maxPages || null, confidence: null, pageTexts };
-}
+// NOTE: We intentionally do not run client-side OCR (e.g. Tesseract) in this app.
+// For scanned PDFs and images we rely on the server OCR endpoint.
 
 async function requestDocumentAi(file, summary = state.fileSummary) {
   const sizeMb = Number(file.size || 0) / (1024 * 1024);
