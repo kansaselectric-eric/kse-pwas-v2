@@ -199,6 +199,9 @@ const state = {
   lastResults: null,
   takeoff: [],
   historicalDataset: [],
+  sessionId: localStorage.getItem('kse_ea_session_id') || null,
+  projectId: localStorage.getItem('kse_ea_project_id') || null,
+  planSetId: localStorage.getItem('kse_ea_planset_id') || null,
   processingMode: localStorage.getItem('kse_ea_processing_mode') || 'auto',
   lastOcrConfidence: null,
   fileSummary: null,
@@ -363,8 +366,8 @@ function handleAnalyzeClick() {
   const dict = dictionariesFromCurrent();
   saveDictionaries();
   try {
-    // Highest-quality path: use server-side extraction (LLM) when available.
-    requestServerTakeoff(text, dict)
+    // Highest-quality path: run the server pipeline if we have a session (pages uploaded).
+    requestServerTakeoff()
       .then((data) => {
         if (data?.ok) {
           handleAnalysisResult(data, text, dict);
@@ -391,11 +394,12 @@ function handleAnalyzeClick() {
   }
 }
 
-async function requestServerTakeoff(text, dict) {
+async function requestServerTakeoff() {
+  if (!state.sessionId) return { ok: false, error: 'No session' };
   const res = await fetch('/api/estimate/takeoff', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text, dict })
+    body: JSON.stringify({ sessionId: state.sessionId })
   });
   return await res.json().catch(() => ({ ok: false, error: `Server responded ${res.status}` }));
 }
@@ -764,6 +768,7 @@ function download(filename, blob) {
 async function handleFileInput(e) {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
+  await ensureSession(files[0]?.name || '');
   resetFileIntake();
   state.fileQueue = files.map((file, index) => createFileSummary(file, index));
   renderManifest();
@@ -776,6 +781,33 @@ async function handleFileInput(e) {
   const completed = state.fileQueue.filter((summary) => summary.status === 'Complete').length;
   fileStatus.textContent = `Loaded ${completed}/${state.fileQueue.length} files`;
   generateDictionarySuggestions();
+}
+
+async function ensureSession(fileName) {
+  if (state.sessionId) return state.sessionId;
+  try {
+    const res = await fetch('/api/estacc/sessions/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fileName })
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.ok) throw new Error(data?.error || `Session start failed (${res.status})`);
+    state.sessionId = data.sessionId;
+    state.projectId = data.projectId;
+    state.planSetId = data.planSetId;
+    try {
+      localStorage.setItem('kse_ea_session_id', state.sessionId);
+      localStorage.setItem('kse_ea_project_id', state.projectId);
+      localStorage.setItem('kse_ea_planset_id', state.planSetId);
+    } catch {
+      // ignore storage errors
+    }
+    return state.sessionId;
+  } catch (err) {
+    console.warn('Unable to start Estimate Accelerator session', err);
+    return null;
+  }
 }
 
 function resetFileIntake() {
@@ -1110,7 +1142,10 @@ async function requestPdfOcrAsImages(file, summary = state.fileSummary) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         fileBase64: base64,
-        mimeType: 'image/jpeg'
+        mimeType: 'image/jpeg',
+        sessionId: state.sessionId || undefined,
+        pageIndex: i,
+        fileName: summary?.name || file?.name || undefined
       })
     });
     const payload = await res.json().catch(() => null);
@@ -1165,7 +1200,10 @@ async function requestDocumentAi(file, summary = state.fileSummary) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       fileBase64: base64,
-      mimeType
+      mimeType,
+      sessionId: state.sessionId || undefined,
+      pageIndex: 1,
+      fileName: summary?.name || file?.name || undefined
     })
   });
   const data = await res.json().catch(() => null);
