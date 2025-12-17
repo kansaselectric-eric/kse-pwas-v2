@@ -132,13 +132,9 @@ function createResponsePayload(fileId: string) {
         ]
       }
     ],
-    // OpenAI Responses API: structured output format lives under `text.format`
-    // (older `response_format` is no longer supported).
-    text: {
-      format: {
-        type: 'json_schema' as const,
-        json_schema: JSON_SCHEMA
-      }
+    response_format: {
+      type: 'json_schema' as const,
+      json_schema: JSON_SCHEMA
     }
   };
 }
